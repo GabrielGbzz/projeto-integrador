@@ -1,0 +1,789 @@
+CREATE DATABASE FastBite;
+USE FastBite;
+
+
+CREATE TABLE Cliente(
+    id_cliente INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(100),
+    email VARCHAR(100),
+    telefone VARCHAR(20),
+    endereco VARCHAR(150)
+);
+
+
+CREATE TABLE Restaurante(
+    id_restaurante INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(100),
+    endereco VARCHAR(150),
+    telefone VARCHAR(20),
+    categoria VARCHAR(50)
+);
+
+
+CREATE TABLE Menu(
+    id_menu INT PRIMARY KEY AUTO_INCREMENT,
+    nome_prato VARCHAR(100),
+    descricao VARCHAR(200),
+    preco DECIMAL(10,2),
+    
+    id_restaurante INT,
+    FOREIGN KEY(id_restaurante) 
+    REFERENCES Restaurante(id_restaurante)
+);
+
+
+CREATE TABLE Estafeta(
+    id_estafeta INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(100),
+    telefone VARCHAR(20),
+    veiculo VARCHAR(50),
+    status VARCHAR(30)
+);
+
+
+CREATE TABLE Pedido(
+    id_pedido INT PRIMARY KEY AUTO_INCREMENT,
+    data_pedido DATE,
+    status VARCHAR(30),
+    valor_total DECIMAL(10,2),
+
+    id_cliente INT,
+    id_menu INT,
+    id_estafeta INT,
+
+    FOREIGN KEY(id_cliente)
+    REFERENCES Cliente(id_cliente),
+
+    FOREIGN KEY(id_menu)
+    REFERENCES Menu(id_menu),
+
+    FOREIGN KEY(id_estafeta)
+    REFERENCES Estafeta(id_estafeta)
+);
+
+
+CREATE TABLE Avaliacao(
+    id_avaliacao INT PRIMARY KEY AUTO_INCREMENT,
+    nota INT,
+    comentario VARCHAR(200),
+    data_avaliacao DATE,
+
+    id_pedido INT,
+
+    FOREIGN KEY(id_pedido)
+    REFERENCES Pedido(id_pedido)
+);
+
+
+CREATE TABLE Cupom(
+    id_cupom INT PRIMARY KEY AUTO_INCREMENT,
+    codigo VARCHAR(50),
+    desconto DECIMAL(5,2),
+    validade DATE,
+
+    id_pedido INT,
+
+    FOREIGN KEY(id_pedido)
+    REFERENCES Pedido(id_pedido)
+);
+
+ALTER TABLE Cliente
+ADD data_criacao DATE;
+
+
+ALTER TABLE Restaurante
+ADD data_criacao DATE;
+
+
+ALTER TABLE Menu
+ADD data_criacao DATE;
+
+
+ALTER TABLE Pedido
+ADD data_criacao DATE;
+
+
+ALTER TABLE Estafeta
+ADD data_criacao DATE;
+
+
+ALTER TABLE Avaliacao
+ADD data_criacao DATE;
+
+
+ALTER TABLE Cupom
+ADD data_criacao DATE;
+
+DELIMITER //
+
+CREATE PROCEDURE cadastrarCliente(
+IN p_nome VARCHAR(100),
+IN p_email VARCHAR(100)
+)
+
+BEGIN
+
+DECLARE existe INT;
+
+SELECT COUNT(*) INTO existe
+FROM Cliente
+WHERE email=p_email;
+
+
+IF existe=0 THEN
+
+INSERT INTO Cliente(nome,email)
+VALUES(p_nome,p_email);
+
+ELSE
+
+SELECT 'Cliente já existe';
+
+END IF;
+
+END //
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE PROCEDURE cadastrarRestaurante(
+IN p_nome VARCHAR(100),
+IN p_categoria VARCHAR(50)
+)
+
+BEGIN
+
+DECLARE qtd INT;
+
+SELECT COUNT(*) INTO qtd
+FROM Restaurante
+WHERE nome=p_nome;
+
+
+IF qtd=0 THEN
+
+INSERT INTO Restaurante(nome,categoria)
+VALUES(p_nome,p_categoria);
+
+ELSE
+
+SELECT 'Restaurante já cadastrado';
+
+END IF;
+
+END //
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE PROCEDURE adicionarPrato(
+IN p_nome VARCHAR(100),
+IN p_preco DECIMAL(10,2),
+IN p_restaurante INT
+)
+
+BEGIN
+
+DECLARE existe INT;
+
+
+SELECT COUNT(*) INTO existe
+FROM Restaurante
+WHERE id_restaurante=p_restaurante;
+
+
+IF existe>0 THEN
+
+INSERT INTO Menu(nome_prato,preco,id_restaurante)
+VALUES(p_nome,p_preco,p_restaurante);
+
+ELSE
+
+SELECT 'Restaurante inexistente';
+
+END IF;
+
+
+END //
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE PROCEDURE atualizarEstafeta(
+IN p_id INT,
+IN p_status VARCHAR(30)
+)
+
+BEGIN
+
+DECLARE existe INT;
+
+
+SELECT COUNT(*) INTO existe
+FROM Estafeta
+WHERE id_estafeta=p_id;
+
+
+IF existe>0 THEN
+
+UPDATE Estafeta
+SET status=p_status
+WHERE id_estafeta=p_id;
+
+
+ELSE
+
+SELECT 'Estafeta não encontrado';
+
+END IF;
+
+
+END //
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE PROCEDURE criarPedido(
+IN p_cliente INT,
+IN p_menu INT,
+IN p_valor DECIMAL(10,2)
+)
+
+BEGIN
+
+DECLARE clienteExiste INT;
+
+
+SELECT COUNT(*) INTO clienteExiste
+FROM Cliente
+WHERE id_cliente=p_cliente;
+
+
+IF clienteExiste>0 THEN
+
+INSERT INTO Pedido(
+data_pedido,
+status,
+valor_total,
+id_cliente,
+id_menu
+)
+
+VALUES(
+CURDATE(),
+'Pendente',
+p_valor,
+p_cliente,
+p_menu
+);
+
+
+ELSE
+
+SELECT 'Cliente não existe';
+
+END IF;
+
+
+END //
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE PROCEDURE registrarAvaliacao(
+IN p_nota INT,
+IN p_comentario VARCHAR(200),
+IN p_pedido INT
+)
+
+BEGIN
+
+DECLARE pedidoExiste INT;
+
+
+SELECT COUNT(*) INTO pedidoExiste
+FROM Pedido
+WHERE id_pedido=p_pedido;
+
+
+IF pedidoExiste>0 THEN
+
+INSERT INTO Avaliacao(
+nota,
+comentario,
+data_avaliacao,
+id_pedido
+)
+
+VALUES(
+p_nota,
+p_comentario,
+CURDATE(),
+p_pedido
+);
+
+
+ELSE
+
+SELECT 'Pedido inexistente';
+
+END IF;
+
+
+END //
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE PROCEDURE aplicarCupom(
+IN p_codigo VARCHAR(50),
+IN p_desconto DECIMAL(5,2),
+IN p_pedido INT
+)
+
+BEGIN
+
+DECLARE valor DECIMAL(10,2);
+
+
+SELECT valor_total INTO valor
+FROM Pedido
+WHERE id_pedido=p_pedido;
+
+
+IF valor IS NOT NULL THEN
+
+
+UPDATE Pedido
+SET valor_total = valor - (valor*p_desconto/100)
+WHERE id_pedido=p_pedido;
+
+
+INSERT INTO Cupom(
+codigo,
+desconto,
+validade,
+id_pedido
+)
+
+VALUES(
+p_codigo,
+p_desconto,
+DATE_ADD(CURDATE(),INTERVAL 30 DAY),
+p_pedido
+);
+
+
+ELSE
+
+SELECT 'Pedido não encontrado';
+
+END IF;
+
+
+END //
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_status_pedido
+BEFORE INSERT ON Pedido
+FOR EACH ROW
+BEGIN
+
+SET NEW.status = 'Em preparo';
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_estafeta_ocupado
+AFTER INSERT ON Pedido
+FOR EACH ROW
+BEGIN
+
+UPDATE Estafeta
+SET status = 'Ocupado'
+WHERE id_estafeta = NEW.id_estafeta;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_validar_cupom
+BEFORE INSERT ON Cupom
+FOR EACH ROW
+BEGIN
+
+IF NEW.validade < CURDATE() THEN
+
+SIGNAL SQLSTATE '45000'
+SET MESSAGE_TEXT = 'Cupom expirado.';
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 1','cliente1@mail.com','31990000001','Rua 1','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 2','cliente2@mail.com','31990000002','Rua 2','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 3','cliente3@mail.com','31990000003','Rua 3','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 4','cliente4@mail.com','31990000004','Rua 4','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 5','cliente5@mail.com','31990000005','Rua 5','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 6','cliente6@mail.com','31990000006','Rua 6','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 7','cliente7@mail.com','31990000007','Rua 7','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 8','cliente8@mail.com','31990000008','Rua 8','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 9','cliente9@mail.com','31990000009','Rua 9','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 10','cliente10@mail.com','31990000010','Rua 10','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 11','cliente11@mail.com','31990000011','Rua 11','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 12','cliente12@mail.com','31990000012','Rua 12','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 13','cliente13@mail.com','31990000013','Rua 13','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 14','cliente14@mail.com','31990000014','Rua 14','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 15','cliente15@mail.com','31990000015','Rua 15','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 16','cliente16@mail.com','31990000016','Rua 16','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 17','cliente17@mail.com','31990000017','Rua 17','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 18','cliente18@mail.com','31990000018','Rua 18','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 19','cliente19@mail.com','31990000019','Rua 19','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 20','cliente20@mail.com','31990000020','Rua 20','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 21','cliente21@mail.com','31990000021','Rua 21','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 22','cliente22@mail.com','31990000022','Rua 22','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 23','cliente23@mail.com','31990000023','Rua 23','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 24','cliente24@mail.com','31990000024','Rua 24','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 25','cliente25@mail.com','31990000025','Rua 25','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 26','cliente26@mail.com','31990000026','Rua 26','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 27','cliente27@mail.com','31990000027','Rua 27','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 28','cliente28@mail.com','31990000028','Rua 28','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 29','cliente29@mail.com','31990000029','Rua 29','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 30','cliente30@mail.com','31990000030','Rua 30','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 31','cliente31@mail.com','31990000031','Rua 31','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 32','cliente32@mail.com','31990000032','Rua 32','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 33','cliente33@mail.com','31990000033','Rua 33','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 34','cliente34@mail.com','31990000034','Rua 34','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 35','cliente35@mail.com','31990000035','Rua 35','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 36','cliente36@mail.com','31990000036','Rua 36','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 37','cliente37@mail.com','31990000037','Rua 37','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 38','cliente38@mail.com','31990000038','Rua 38','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 39','cliente39@mail.com','31990000039','Rua 39','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 40','cliente40@mail.com','31990000040','Rua 40','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 41','cliente41@mail.com','31990000041','Rua 41','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 42','cliente42@mail.com','31990000042','Rua 42','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 43','cliente43@mail.com','31990000043','Rua 43','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 44','cliente44@mail.com','31990000044','Rua 44','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 45','cliente45@mail.com','31990000045','Rua 45','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 46','cliente46@mail.com','31990000046','Rua 46','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 47','cliente47@mail.com','31990000047','Rua 47','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 48','cliente48@mail.com','31990000048','Rua 48','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 49','cliente49@mail.com','31990000049','Rua 49','2026-01-01');
+INSERT INTO Cliente(nome,email,telefone,endereco,data_criacao) VALUES('Cliente 50','cliente50@mail.com','31990000050','Rua 50','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 1','Av 1','31330000001','Categoria 2','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 2','Av 2','31330000002','Categoria 3','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 3','Av 3','31330000003','Categoria 4','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 4','Av 4','31330000004','Categoria 5','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 5','Av 5','31330000005','Categoria 1','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 6','Av 6','31330000006','Categoria 2','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 7','Av 7','31330000007','Categoria 3','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 8','Av 8','31330000008','Categoria 4','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 9','Av 9','31330000009','Categoria 5','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 10','Av 10','31330000010','Categoria 1','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 11','Av 11','31330000011','Categoria 2','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 12','Av 12','31330000012','Categoria 3','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 13','Av 13','31330000013','Categoria 4','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 14','Av 14','31330000014','Categoria 5','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 15','Av 15','31330000015','Categoria 1','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 16','Av 16','31330000016','Categoria 2','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 17','Av 17','31330000017','Categoria 3','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 18','Av 18','31330000018','Categoria 4','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 19','Av 19','31330000019','Categoria 5','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 20','Av 20','31330000020','Categoria 1','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 21','Av 21','31330000021','Categoria 2','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 22','Av 22','31330000022','Categoria 3','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 23','Av 23','31330000023','Categoria 4','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 24','Av 24','31330000024','Categoria 5','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 25','Av 25','31330000025','Categoria 1','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 26','Av 26','31330000026','Categoria 2','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 27','Av 27','31330000027','Categoria 3','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 28','Av 28','31330000028','Categoria 4','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 29','Av 29','31330000029','Categoria 5','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 30','Av 30','31330000030','Categoria 1','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 31','Av 31','31330000031','Categoria 2','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 32','Av 32','31330000032','Categoria 3','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 33','Av 33','31330000033','Categoria 4','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 34','Av 34','31330000034','Categoria 5','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 35','Av 35','31330000035','Categoria 1','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 36','Av 36','31330000036','Categoria 2','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 37','Av 37','31330000037','Categoria 3','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 38','Av 38','31330000038','Categoria 4','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 39','Av 39','31330000039','Categoria 5','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 40','Av 40','31330000040','Categoria 1','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 41','Av 41','31330000041','Categoria 2','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 42','Av 42','31330000042','Categoria 3','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 43','Av 43','31330000043','Categoria 4','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 44','Av 44','31330000044','Categoria 5','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 45','Av 45','31330000045','Categoria 1','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 46','Av 46','31330000046','Categoria 2','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 47','Av 47','31330000047','Categoria 3','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 48','Av 48','31330000048','Categoria 4','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 49','Av 49','31330000049','Categoria 5','2026-01-01');
+INSERT INTO Restaurante(nome,endereco,telefone,categoria,data_criacao) VALUES('Restaurante 50','Av 50','31330000050','Categoria 1','2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 1','Descricao 1',21.00,1,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 2','Descricao 2',22.00,2,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 3','Descricao 3',23.00,3,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 4','Descricao 4',24.00,4,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 5','Descricao 5',25.00,5,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 6','Descricao 6',26.00,6,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 7','Descricao 7',27.00,7,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 8','Descricao 8',28.00,8,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 9','Descricao 9',29.00,9,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 10','Descricao 10',30.00,10,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 11','Descricao 11',31.00,11,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 12','Descricao 12',32.00,12,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 13','Descricao 13',33.00,13,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 14','Descricao 14',34.00,14,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 15','Descricao 15',35.00,15,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 16','Descricao 16',36.00,16,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 17','Descricao 17',37.00,17,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 18','Descricao 18',38.00,18,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 19','Descricao 19',39.00,19,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 20','Descricao 20',40.00,20,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 21','Descricao 21',41.00,21,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 22','Descricao 22',42.00,22,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 23','Descricao 23',43.00,23,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 24','Descricao 24',44.00,24,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 25','Descricao 25',45.00,25,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 26','Descricao 26',46.00,26,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 27','Descricao 27',47.00,27,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 28','Descricao 28',48.00,28,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 29','Descricao 29',49.00,29,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 30','Descricao 30',50.00,30,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 31','Descricao 31',51.00,31,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 32','Descricao 32',52.00,32,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 33','Descricao 33',53.00,33,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 34','Descricao 34',54.00,34,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 35','Descricao 35',55.00,35,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 36','Descricao 36',56.00,36,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 37','Descricao 37',57.00,37,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 38','Descricao 38',58.00,38,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 39','Descricao 39',59.00,39,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 40','Descricao 40',60.00,40,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 41','Descricao 41',61.00,41,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 42','Descricao 42',62.00,42,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 43','Descricao 43',63.00,43,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 44','Descricao 44',64.00,44,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 45','Descricao 45',65.00,45,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 46','Descricao 46',66.00,46,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 47','Descricao 47',67.00,47,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 48','Descricao 48',68.00,48,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 49','Descricao 49',69.00,49,'2026-01-01');
+INSERT INTO Menu(nome_prato,descricao,preco,id_restaurante,data_criacao) VALUES('Prato 50','Descricao 50',70.00,50,'2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 1','31770000001','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 2','31770000002','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 3','31770000003','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 4','31770000004','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 5','31770000005','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 6','31770000006','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 7','31770000007','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 8','31770000008','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 9','31770000009','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 10','31770000010','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 11','31770000011','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 12','31770000012','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 13','31770000013','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 14','31770000014','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 15','31770000015','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 16','31770000016','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 17','31770000017','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 18','31770000018','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 19','31770000019','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 20','31770000020','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 21','31770000021','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 22','31770000022','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 23','31770000023','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 24','31770000024','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 25','31770000025','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 26','31770000026','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 27','31770000027','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 28','31770000028','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 29','31770000029','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 30','31770000030','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 31','31770000031','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 32','31770000032','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 33','31770000033','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 34','31770000034','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 35','31770000035','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 36','31770000036','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 37','31770000037','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 38','31770000038','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 39','31770000039','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 40','31770000040','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 41','31770000041','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 42','31770000042','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 43','31770000043','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 44','31770000044','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 45','31770000045','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 46','31770000046','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 47','31770000047','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 48','31770000048','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 49','31770000049','Moto','Disponível','2026-01-01');
+INSERT INTO Estafeta(nome,telefone,veiculo,status,data_criacao) VALUES('Estafeta 50','31770000050','Moto','Disponível','2026-01-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',31.00,1,1,1,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',32.00,2,2,2,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',33.00,3,3,3,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',34.00,4,4,4,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',35.00,5,5,5,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',36.00,6,6,6,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',37.00,7,7,7,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',38.00,8,8,8,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',39.00,9,9,9,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',40.00,10,10,10,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',41.00,11,11,11,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',42.00,12,12,12,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',43.00,13,13,13,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',44.00,14,14,14,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',45.00,15,15,15,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',46.00,16,16,16,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',47.00,17,17,17,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',48.00,18,18,18,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',49.00,19,19,19,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',50.00,20,20,20,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',51.00,21,21,21,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',52.00,22,22,22,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',53.00,23,23,23,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',54.00,24,24,24,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',55.00,25,25,25,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',56.00,26,26,26,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',57.00,27,27,27,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',58.00,28,28,28,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',59.00,29,29,29,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',60.00,30,30,30,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',61.00,31,31,31,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',62.00,32,32,32,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',63.00,33,33,33,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',64.00,34,34,34,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',65.00,35,35,35,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',66.00,36,36,36,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',67.00,37,37,37,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',68.00,38,38,38,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',69.00,39,39,39,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',70.00,40,40,40,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',71.00,41,41,41,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',72.00,42,42,42,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',73.00,43,43,43,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',74.00,44,44,44,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',75.00,45,45,45,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',76.00,46,46,46,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',77.00,47,47,47,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',78.00,48,48,48,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',79.00,49,49,49,'2026-07-01');
+INSERT INTO Pedido(data_pedido,status,valor_total,id_cliente,id_menu,id_estafeta,data_criacao) VALUES('2026-07-01','Em preparo',80.00,50,50,50,'2026-07-01');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(2,'Muito bom 1','2026-07-02',1,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(3,'Muito bom 2','2026-07-02',2,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(4,'Muito bom 3','2026-07-02',3,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(5,'Muito bom 4','2026-07-02',4,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(1,'Muito bom 5','2026-07-02',5,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(2,'Muito bom 6','2026-07-02',6,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(3,'Muito bom 7','2026-07-02',7,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(4,'Muito bom 8','2026-07-02',8,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(5,'Muito bom 9','2026-07-02',9,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(1,'Muito bom 10','2026-07-02',10,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(2,'Muito bom 11','2026-07-02',11,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(3,'Muito bom 12','2026-07-02',12,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(4,'Muito bom 13','2026-07-02',13,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(5,'Muito bom 14','2026-07-02',14,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(1,'Muito bom 15','2026-07-02',15,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(2,'Muito bom 16','2026-07-02',16,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(3,'Muito bom 17','2026-07-02',17,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(4,'Muito bom 18','2026-07-02',18,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(5,'Muito bom 19','2026-07-02',19,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(1,'Muito bom 20','2026-07-02',20,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(2,'Muito bom 21','2026-07-02',21,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(3,'Muito bom 22','2026-07-02',22,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(4,'Muito bom 23','2026-07-02',23,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(5,'Muito bom 24','2026-07-02',24,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(1,'Muito bom 25','2026-07-02',25,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(2,'Muito bom 26','2026-07-02',26,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(3,'Muito bom 27','2026-07-02',27,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(4,'Muito bom 28','2026-07-02',28,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(5,'Muito bom 29','2026-07-02',29,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(1,'Muito bom 30','2026-07-02',30,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(2,'Muito bom 31','2026-07-02',31,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(3,'Muito bom 32','2026-07-02',32,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(4,'Muito bom 33','2026-07-02',33,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(5,'Muito bom 34','2026-07-02',34,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(1,'Muito bom 35','2026-07-02',35,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(2,'Muito bom 36','2026-07-02',36,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(3,'Muito bom 37','2026-07-02',37,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(4,'Muito bom 38','2026-07-02',38,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(5,'Muito bom 39','2026-07-02',39,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(1,'Muito bom 40','2026-07-02',40,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(2,'Muito bom 41','2026-07-02',41,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(3,'Muito bom 42','2026-07-02',42,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(4,'Muito bom 43','2026-07-02',43,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(5,'Muito bom 44','2026-07-02',44,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(1,'Muito bom 45','2026-07-02',45,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(2,'Muito bom 46','2026-07-02',46,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(3,'Muito bom 47','2026-07-02',47,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(4,'Muito bom 48','2026-07-02',48,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(5,'Muito bom 49','2026-07-02',49,'2026-07-02');
+INSERT INTO Avaliacao(nota,comentario,data_avaliacao,id_pedido,data_criacao) VALUES(1,'Muito bom 50','2026-07-02',50,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM1',10.00,'2026-12-31',1,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM2',10.00,'2026-12-31',2,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM3',10.00,'2026-12-31',3,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM4',10.00,'2026-12-31',4,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM5',10.00,'2026-12-31',5,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM6',10.00,'2026-12-31',6,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM7',10.00,'2026-12-31',7,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM8',10.00,'2026-12-31',8,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM9',10.00,'2026-12-31',9,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM10',10.00,'2026-12-31',10,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM11',10.00,'2026-12-31',11,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM12',10.00,'2026-12-31',12,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM13',10.00,'2026-12-31',13,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM14',10.00,'2026-12-31',14,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM15',10.00,'2026-12-31',15,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM16',10.00,'2026-12-31',16,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM17',10.00,'2026-12-31',17,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM18',10.00,'2026-12-31',18,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM19',10.00,'2026-12-31',19,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM20',10.00,'2026-12-31',20,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM21',10.00,'2026-12-31',21,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM22',10.00,'2026-12-31',22,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM23',10.00,'2026-12-31',23,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM24',10.00,'2026-12-31',24,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM25',10.00,'2026-12-31',25,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM26',10.00,'2026-12-31',26,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM27',10.00,'2026-12-31',27,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM28',10.00,'2026-12-31',28,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM29',10.00,'2026-12-31',29,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM30',10.00,'2026-12-31',30,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM31',10.00,'2026-12-31',31,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM32',10.00,'2026-12-31',32,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM33',10.00,'2026-12-31',33,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM34',10.00,'2026-12-31',34,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM35',10.00,'2026-12-31',35,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM36',10.00,'2026-12-31',36,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM37',10.00,'2026-12-31',37,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM38',10.00,'2026-12-31',38,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM39',10.00,'2026-12-31',39,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM40',10.00,'2026-12-31',40,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM41',10.00,'2026-12-31',41,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM42',10.00,'2026-12-31',42,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM43',10.00,'2026-12-31',43,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM44',10.00,'2026-12-31',44,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM45',10.00,'2026-12-31',45,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM46',10.00,'2026-12-31',46,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM47',10.00,'2026-12-31',47,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM48',10.00,'2026-12-31',48,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM49',10.00,'2026-12-31',49,'2026-07-02');
+INSERT INTO Cupom(codigo,desconto,validade,id_pedido,data_criacao) VALUES('CUPOM50',10.00,'2026-12-31',50,'2026-07-02');
