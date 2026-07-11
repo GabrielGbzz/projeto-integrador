@@ -1,0 +1,731 @@
+CREATE DATABASE bibliotech;
+USE bibliotech;
+
+CREATE TABLE Cliente (
+id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+nome VARCHAR(50),
+email VARCHAR(50),
+endereco VARCHAR(99),
+telefone VARCHAR(15)
+);
+
+CREATE TABLE Categoria (
+id_categoria INT AUTO_INCREMENT PRIMARY KEY,
+nome VARCHAR(50),
+descricao VARCHAR(100)
+);
+
+CREATE TABLE Autor (
+id_autor INT AUTO_INCREMENT PRIMARY KEY,
+nome VARCHAR(50),
+nacionalidade VARCHAR(50),
+data_nascimento DATE
+);
+
+CREATE TABLE Livro (
+id_livro INT AUTO_INCREMENT PRIMARY KEY,
+titulo VARCHAR(100),
+isbn VARCHAR(50),
+ano_publicacao DATE,
+tipo_emprestimo VARCHAR(1),
+
+id_autor INT,
+id_categoria INT,
+
+FOREIGN KEY (id_autor)
+REFERENCES Autor(id_autor),
+
+FOREIGN KEY (id_categoria)
+REFERENCES Categoria(id_categoria)
+);
+
+CREATE TABLE Exemplar (
+id_exemplar INT AUTO_INCREMENT PRIMARY KEY,
+codigo_exemplar VARCHAR(11),
+estado_conservacao VARCHAR(30),
+disponibilidade VARCHAR(20),
+
+id_livro INT,
+
+FOREIGN KEY (id_livro)
+REFERENCES Livro(id_livro)
+);
+
+CREATE TABLE Emprestimo (
+id_emprestimo INT AUTO_INCREMENT PRIMARY KEY,
+data_emprestimo DATE,
+data_prevista_devolucao DATE,
+data_devolucao DATE,
+tipo VARCHAR(20),
+
+id_cliente INT,
+id_exemplar INT,
+
+FOREIGN KEY (id_cliente)
+REFERENCES Cliente(id_cliente),
+FOREIGN KEY (id_exemplar)
+REFERENCES Exemplar(id_exemplar)
+);
+
+CREATE TABLE Multa (
+id_multa INT AUTO_INCREMENT PRIMARY KEY,
+valor DECIMAL(10,2),
+data_multa DATE,
+status_pagamento VARCHAR(20),
+
+id_emprestimo INT,
+
+FOREIGN KEY (id_emprestimo)
+REFERENCES Emprestimo(id_emprestimo)
+);
+
+ALTER TABLE Cliente
+ADD status_ativo BOOLEAN;
+
+ALTER TABLE Categoria
+ADD data_criacao DATETIME;
+
+ALTER TABLE Autor
+ADD observacoes VARCHAR(200);
+
+ALTER TABLE Livro
+ADD usuario_alteracao VARCHAR(50);
+
+ALTER TABLE Exemplar
+ADD data_registro DATE;
+
+ALTER TABLE Emprestimo
+ADD observacoes VARCHAR(200);
+
+ALTER TABLE Multa
+ADD data_pagamento DATE;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirCliente(
+
+IN p_nome VARCHAR(50),
+IN p_email VARCHAR(50),
+IN p_endereco VARCHAR(99),
+IN p_telefone VARCHAR(15)
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Cliente WHERE email=p_email) THEN
+
+SELECT 'Cliente já cadastrado.' AS Mensagem;
+
+ELSE
+
+INSERT INTO Cliente(nome,email,endereco,telefone)
+VALUES(p_nome,p_email,p_endereco,p_telefone);
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirCategoria(
+
+IN p_nome VARCHAR(50),
+IN p_descricao VARCHAR(100)
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Categoria WHERE nome=p_nome) THEN
+
+SELECT 'Categoria já existe.';
+
+ELSE
+
+INSERT INTO Categoria(nome,descricao)
+VALUES(p_nome,p_descricao);
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirAutor(
+
+IN p_nome VARCHAR(50),
+IN p_nacionalidade VARCHAR(50),
+IN p_data DATE
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Autor WHERE nome=p_nome) THEN
+
+SELECT 'Autor já cadastrado.';
+
+ELSE
+
+INSERT INTO Autor(nome,nacionalidade,data_nascimento)
+VALUES(p_nome,p_nacionalidade,p_data);
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirLivro(
+
+IN p_titulo VARCHAR(100),
+IN p_isbn VARCHAR(50),
+IN p_ano DATE,
+IN p_tipo VARCHAR(1),
+IN p_autor INT,
+IN p_categoria INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Autor WHERE id_autor=p_autor)
+AND EXISTS(SELECT * FROM Categoria WHERE id_categoria=p_categoria) THEN
+
+INSERT INTO Livro
+(titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria)
+
+VALUES
+(p_titulo,p_isbn,p_ano,p_tipo,p_autor,p_categoria);
+
+ELSE
+
+SELECT 'Autor ou Categoria inexistente.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirExemplar(
+
+IN p_codigo VARCHAR(11),
+IN p_estado VARCHAR(30),
+IN p_disponibilidade VARCHAR(20),
+IN p_livro INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Livro WHERE id_livro=p_livro) THEN
+
+INSERT INTO Exemplar
+(codigo_exemplar,estado_conservacao,disponibilidade,id_livro)
+
+VALUES
+(p_codigo,p_estado,p_disponibilidade,p_livro);
+
+ELSE
+
+SELECT 'Livro não encontrado.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE RealizarEmprestimo(
+
+IN p_data DATE,
+IN p_prevista DATE,
+IN p_tipo VARCHAR(20),
+IN p_cliente INT,
+IN p_exemplar INT
+
+)
+BEGIN
+
+DECLARE disponibilidade_atual VARCHAR(20);
+
+SELECT disponibilidade
+INTO disponibilidade_atual
+FROM Exemplar
+WHERE id_exemplar=p_exemplar;
+
+IF disponibilidade_atual='Disponível' THEN
+
+INSERT INTO Emprestimo
+(data_emprestimo,data_prevista_devolucao,tipo,id_cliente,id_exemplar)
+
+VALUES
+(p_data,p_prevista,p_tipo,p_cliente,p_exemplar);
+
+UPDATE Exemplar
+SET disponibilidade='Emprestado'
+WHERE id_exemplar=p_exemplar;
+
+ELSE
+
+SELECT 'Exemplar indisponível.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE GerarMulta(
+
+IN p_valor DECIMAL(10,2),
+IN p_data DATE,
+IN p_emprestimo INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Emprestimo WHERE id_emprestimo=p_emprestimo) THEN
+
+INSERT INTO Multa
+(valor,data_multa,status_pagamento,id_emprestimo)
+
+VALUES
+(p_valor,p_data,'Pendente',p_emprestimo);
+
+ELSE
+
+SELECT 'Empréstimo não encontrado.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_emprestimo_exemplar
+AFTER INSERT ON Emprestimo
+FOR EACH ROW
+BEGIN
+
+UPDATE Exemplar
+SET disponibilidade = 'Indisponível'
+WHERE id_exemplar = NEW.id_exemplar;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_devolucao_exemplar
+AFTER UPDATE ON Emprestimo
+FOR EACH ROW
+BEGIN
+
+IF NEW.data_devolucao IS NOT NULL THEN
+
+UPDATE Exemplar
+SET disponibilidade = 'Disponível'
+WHERE id_exemplar = NEW.id_exemplar;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_gerar_multa
+AFTER UPDATE ON Emprestimo
+FOR EACH ROW
+BEGIN
+
+IF NEW.data_devolucao > NEW.data_prevista_devolucao THEN
+
+INSERT INTO Multa
+(valor, data_multa, status_pagamento, id_emprestimo)
+
+VALUES
+(20.00, CURDATE(), 'Pendente', NEW.id_emprestimo);
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 1','cliente1@email.com','Rua 1','11990000001');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 2','cliente2@email.com','Rua 2','11990000002');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 3','cliente3@email.com','Rua 3','11990000003');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 4','cliente4@email.com','Rua 4','11990000004');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 5','cliente5@email.com','Rua 5','11990000005');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 6','cliente6@email.com','Rua 6','11990000006');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 7','cliente7@email.com','Rua 7','11990000007');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 8','cliente8@email.com','Rua 8','11990000008');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 9','cliente9@email.com','Rua 9','11990000009');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 10','cliente10@email.com','Rua 10','11990000010');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 11','cliente11@email.com','Rua 11','11990000011');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 12','cliente12@email.com','Rua 12','11990000012');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 13','cliente13@email.com','Rua 13','11990000013');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 14','cliente14@email.com','Rua 14','11990000014');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 15','cliente15@email.com','Rua 15','11990000015');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 16','cliente16@email.com','Rua 16','11990000016');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 17','cliente17@email.com','Rua 17','11990000017');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 18','cliente18@email.com','Rua 18','11990000018');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 19','cliente19@email.com','Rua 19','11990000019');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 20','cliente20@email.com','Rua 20','11990000020');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 21','cliente21@email.com','Rua 21','11990000021');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 22','cliente22@email.com','Rua 22','11990000022');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 23','cliente23@email.com','Rua 23','11990000023');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 24','cliente24@email.com','Rua 24','11990000024');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 25','cliente25@email.com','Rua 25','11990000025');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 26','cliente26@email.com','Rua 26','11990000026');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 27','cliente27@email.com','Rua 27','11990000027');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 28','cliente28@email.com','Rua 28','11990000028');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 29','cliente29@email.com','Rua 29','11990000029');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 30','cliente30@email.com','Rua 30','11990000030');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 31','cliente31@email.com','Rua 31','11990000031');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 32','cliente32@email.com','Rua 32','11990000032');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 33','cliente33@email.com','Rua 33','11990000033');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 34','cliente34@email.com','Rua 34','11990000034');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 35','cliente35@email.com','Rua 35','11990000035');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 36','cliente36@email.com','Rua 36','11990000036');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 37','cliente37@email.com','Rua 37','11990000037');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 38','cliente38@email.com','Rua 38','11990000038');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 39','cliente39@email.com','Rua 39','11990000039');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 40','cliente40@email.com','Rua 40','11990000040');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 41','cliente41@email.com','Rua 41','11990000041');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 42','cliente42@email.com','Rua 42','11990000042');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 43','cliente43@email.com','Rua 43','11990000043');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 44','cliente44@email.com','Rua 44','11990000044');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 45','cliente45@email.com','Rua 45','11990000045');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 46','cliente46@email.com','Rua 46','11990000046');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 47','cliente47@email.com','Rua 47','11990000047');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 48','cliente48@email.com','Rua 48','11990000048');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 49','cliente49@email.com','Rua 49','11990000049');
+INSERT INTO Cliente (nome,email,endereco,telefone) VALUES ('Cliente 50','cliente50@email.com','Rua 50','11990000050');
+
+-- Categoria
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 1','Descricao da categoria 1');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 2','Descricao da categoria 2');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 3','Descricao da categoria 3');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 4','Descricao da categoria 4');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 5','Descricao da categoria 5');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 6','Descricao da categoria 6');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 7','Descricao da categoria 7');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 8','Descricao da categoria 8');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 9','Descricao da categoria 9');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 10','Descricao da categoria 10');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 11','Descricao da categoria 11');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 12','Descricao da categoria 12');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 13','Descricao da categoria 13');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 14','Descricao da categoria 14');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 15','Descricao da categoria 15');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 16','Descricao da categoria 16');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 17','Descricao da categoria 17');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 18','Descricao da categoria 18');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 19','Descricao da categoria 19');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 20','Descricao da categoria 20');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 21','Descricao da categoria 21');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 22','Descricao da categoria 22');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 23','Descricao da categoria 23');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 24','Descricao da categoria 24');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 25','Descricao da categoria 25');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 26','Descricao da categoria 26');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 27','Descricao da categoria 27');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 28','Descricao da categoria 28');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 29','Descricao da categoria 29');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 30','Descricao da categoria 30');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 31','Descricao da categoria 31');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 32','Descricao da categoria 32');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 33','Descricao da categoria 33');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 34','Descricao da categoria 34');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 35','Descricao da categoria 35');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 36','Descricao da categoria 36');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 37','Descricao da categoria 37');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 38','Descricao da categoria 38');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 39','Descricao da categoria 39');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 40','Descricao da categoria 40');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 41','Descricao da categoria 41');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 42','Descricao da categoria 42');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 43','Descricao da categoria 43');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 44','Descricao da categoria 44');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 45','Descricao da categoria 45');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 46','Descricao da categoria 46');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 47','Descricao da categoria 47');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 48','Descricao da categoria 48');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 49','Descricao da categoria 49');
+INSERT INTO Categoria (nome,descricao) VALUES ('Categoria 50','Descricao da categoria 50');
+
+-- Autor
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 1','Brasil','1980-01-01');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 2','Brasil','1980-01-02');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 3','Brasil','1980-01-03');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 4','Brasil','1980-01-04');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 5','Brasil','1980-01-05');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 6','Brasil','1980-01-06');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 7','Brasil','1980-01-07');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 8','Brasil','1980-01-08');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 9','Brasil','1980-01-09');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 10','Brasil','1980-01-10');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 11','Brasil','1980-01-11');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 12','Brasil','1980-01-12');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 13','Brasil','1980-01-13');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 14','Brasil','1980-01-14');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 15','Brasil','1980-01-15');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 16','Brasil','1980-01-16');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 17','Brasil','1980-01-17');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 18','Brasil','1980-01-18');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 19','Brasil','1980-01-19');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 20','Brasil','1980-01-20');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 21','Brasil','1980-01-21');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 22','Brasil','1980-01-22');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 23','Brasil','1980-01-23');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 24','Brasil','1980-01-24');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 25','Brasil','1980-01-25');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 26','Brasil','1980-01-26');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 27','Brasil','1980-01-27');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 28','Brasil','1980-01-28');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 29','Brasil','1980-01-01');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 30','Brasil','1980-01-02');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 31','Brasil','1980-01-03');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 32','Brasil','1980-01-04');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 33','Brasil','1980-01-05');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 34','Brasil','1980-01-06');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 35','Brasil','1980-01-07');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 36','Brasil','1980-01-08');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 37','Brasil','1980-01-09');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 38','Brasil','1980-01-10');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 39','Brasil','1980-01-11');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 40','Brasil','1980-01-12');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 41','Brasil','1980-01-13');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 42','Brasil','1980-01-14');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 43','Brasil','1980-01-15');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 44','Brasil','1980-01-16');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 45','Brasil','1980-01-17');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 46','Brasil','1980-01-18');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 47','Brasil','1980-01-19');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 48','Brasil','1980-01-20');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 49','Brasil','1980-01-21');
+INSERT INTO Autor (nome,nacionalidade,data_nascimento) VALUES ('Autor 50','Brasil','1980-01-22');
+
+-- Livro
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 1','ISBN00001','2020-01-01','D',1,1);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 2','ISBN00002','2020-01-02','D',2,2);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 3','ISBN00003','2020-01-03','D',3,3);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 4','ISBN00004','2020-01-04','D',4,4);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 5','ISBN00005','2020-01-05','D',5,5);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 6','ISBN00006','2020-01-06','D',6,6);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 7','ISBN00007','2020-01-07','D',7,7);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 8','ISBN00008','2020-01-08','D',8,8);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 9','ISBN00009','2020-01-09','D',9,9);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 10','ISBN00010','2020-01-10','D',10,10);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 11','ISBN00011','2020-01-11','D',11,11);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 12','ISBN00012','2020-01-12','D',12,12);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 13','ISBN00013','2020-01-13','D',13,13);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 14','ISBN00014','2020-01-14','D',14,14);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 15','ISBN00015','2020-01-15','D',15,15);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 16','ISBN00016','2020-01-16','D',16,16);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 17','ISBN00017','2020-01-17','D',17,17);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 18','ISBN00018','2020-01-18','D',18,18);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 19','ISBN00019','2020-01-19','D',19,19);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 20','ISBN00020','2020-01-20','D',20,20);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 21','ISBN00021','2020-01-21','D',21,21);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 22','ISBN00022','2020-01-22','D',22,22);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 23','ISBN00023','2020-01-23','D',23,23);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 24','ISBN00024','2020-01-24','D',24,24);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 25','ISBN00025','2020-01-25','D',25,25);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 26','ISBN00026','2020-01-26','D',26,26);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 27','ISBN00027','2020-01-27','D',27,27);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 28','ISBN00028','2020-01-28','D',28,28);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 29','ISBN00029','2020-01-01','D',29,29);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 30','ISBN00030','2020-01-02','D',30,30);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 31','ISBN00031','2020-01-03','D',31,31);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 32','ISBN00032','2020-01-04','D',32,32);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 33','ISBN00033','2020-01-05','D',33,33);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 34','ISBN00034','2020-01-06','D',34,34);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 35','ISBN00035','2020-01-07','D',35,35);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 36','ISBN00036','2020-01-08','D',36,36);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 37','ISBN00037','2020-01-09','D',37,37);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 38','ISBN00038','2020-01-10','D',38,38);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 39','ISBN00039','2020-01-11','D',39,39);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 40','ISBN00040','2020-01-12','D',40,40);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 41','ISBN00041','2020-01-13','D',41,41);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 42','ISBN00042','2020-01-14','D',42,42);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 43','ISBN00043','2020-01-15','D',43,43);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 44','ISBN00044','2020-01-16','D',44,44);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 45','ISBN00045','2020-01-17','D',45,45);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 46','ISBN00046','2020-01-18','D',46,46);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 47','ISBN00047','2020-01-19','D',47,47);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 48','ISBN00048','2020-01-20','D',48,48);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 49','ISBN00049','2020-01-21','D',49,49);
+INSERT INTO Livro (titulo,isbn,ano_publicacao,tipo_emprestimo,id_autor,id_categoria) VALUES ('Livro 50','ISBN00050','2020-01-22','D',50,50);
+
+-- Exemplar
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00001','Bom','Disponível',1);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00002','Bom','Disponível',2);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00003','Bom','Disponível',3);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00004','Bom','Disponível',4);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00005','Bom','Disponível',5);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00006','Bom','Disponível',6);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00007','Bom','Disponível',7);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00008','Bom','Disponível',8);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00009','Bom','Disponível',9);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00010','Bom','Disponível',10);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00011','Bom','Disponível',11);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00012','Bom','Disponível',12);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00013','Bom','Disponível',13);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00014','Bom','Disponível',14);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00015','Bom','Disponível',15);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00016','Bom','Disponível',16);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00017','Bom','Disponível',17);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00018','Bom','Disponível',18);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00019','Bom','Disponível',19);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00020','Bom','Disponível',20);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00021','Bom','Disponível',21);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00022','Bom','Disponível',22);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00023','Bom','Disponível',23);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00024','Bom','Disponível',24);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00025','Bom','Disponível',25);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00026','Bom','Disponível',26);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00027','Bom','Disponível',27);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00028','Bom','Disponível',28);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00029','Bom','Disponível',29);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00030','Bom','Disponível',30);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00031','Bom','Disponível',31);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00032','Bom','Disponível',32);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00033','Bom','Disponível',33);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00034','Bom','Disponível',34);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00035','Bom','Disponível',35);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00036','Bom','Disponível',36);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00037','Bom','Disponível',37);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00038','Bom','Disponível',38);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00039','Bom','Disponível',39);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00040','Bom','Disponível',40);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00041','Bom','Disponível',41);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00042','Bom','Disponível',42);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00043','Bom','Disponível',43);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00044','Bom','Disponível',44);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00045','Bom','Disponível',45);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00046','Bom','Disponível',46);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00047','Bom','Disponível',47);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00048','Bom','Disponível',48);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00049','Bom','Disponível',49);
+INSERT INTO Exemplar (codigo_exemplar,estado_conservacao,disponibilidade,id_livro) VALUES ('EX00050','Bom','Disponível',50);
+
+-- Emprestimo
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-01','2026-02-01',NULL,'Normal',1,1);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-02','2026-02-02',NULL,'Normal',2,2);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-03','2026-02-03',NULL,'Normal',3,3);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-04','2026-02-04',NULL,'Normal',4,4);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-05','2026-02-05',NULL,'Normal',5,5);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-06','2026-02-06',NULL,'Normal',6,6);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-07','2026-02-07',NULL,'Normal',7,7);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-08','2026-02-08',NULL,'Normal',8,8);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-09','2026-02-09',NULL,'Normal',9,9);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-10','2026-02-10',NULL,'Normal',10,10);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-11','2026-02-11',NULL,'Normal',11,11);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-12','2026-02-12',NULL,'Normal',12,12);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-13','2026-02-13',NULL,'Normal',13,13);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-14','2026-02-14',NULL,'Normal',14,14);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-15','2026-02-15',NULL,'Normal',15,15);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-16','2026-02-16',NULL,'Normal',16,16);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-17','2026-02-17',NULL,'Normal',17,17);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-18','2026-02-18',NULL,'Normal',18,18);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-19','2026-02-19',NULL,'Normal',19,19);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-20','2026-02-20',NULL,'Normal',20,20);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-21','2026-02-21',NULL,'Normal',21,21);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-22','2026-02-22',NULL,'Normal',22,22);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-23','2026-02-23',NULL,'Normal',23,23);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-24','2026-02-24',NULL,'Normal',24,24);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-25','2026-02-25',NULL,'Normal',25,25);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-26','2026-02-26',NULL,'Normal',26,26);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-27','2026-02-27',NULL,'Normal',27,27);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-28','2026-02-28',NULL,'Normal',28,28);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-01','2026-02-01',NULL,'Normal',29,29);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-02','2026-02-02',NULL,'Normal',30,30);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-03','2026-02-03',NULL,'Normal',31,31);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-04','2026-02-04',NULL,'Normal',32,32);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-05','2026-02-05',NULL,'Normal',33,33);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-06','2026-02-06',NULL,'Normal',34,34);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-07','2026-02-07',NULL,'Normal',35,35);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-08','2026-02-08',NULL,'Normal',36,36);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-09','2026-02-09',NULL,'Normal',37,37);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-10','2026-02-10',NULL,'Normal',38,38);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-11','2026-02-11',NULL,'Normal',39,39);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-12','2026-02-12',NULL,'Normal',40,40);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-13','2026-02-13',NULL,'Normal',41,41);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-14','2026-02-14',NULL,'Normal',42,42);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-15','2026-02-15',NULL,'Normal',43,43);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-16','2026-02-16',NULL,'Normal',44,44);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-17','2026-02-17',NULL,'Normal',45,45);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-18','2026-02-18',NULL,'Normal',46,46);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-19','2026-02-19',NULL,'Normal',47,47);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-20','2026-02-20',NULL,'Normal',48,48);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-21','2026-02-21',NULL,'Normal',49,49);
+INSERT INTO Emprestimo (data_emprestimo,data_prevista_devolucao,data_devolucao,tipo,id_cliente,id_exemplar) VALUES ('2026-01-22','2026-02-22',NULL,'Normal',50,50);
+
+-- Multa
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (11.00,'2026-03-01','Pendente',1);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (12.00,'2026-03-02','Pendente',2);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (13.00,'2026-03-03','Pendente',3);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (14.00,'2026-03-04','Pendente',4);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (15.00,'2026-03-05','Pendente',5);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (16.00,'2026-03-06','Pendente',6);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (17.00,'2026-03-07','Pendente',7);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (18.00,'2026-03-08','Pendente',8);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (19.00,'2026-03-09','Pendente',9);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (20.00,'2026-03-10','Pendente',10);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (21.00,'2026-03-11','Pendente',11);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (22.00,'2026-03-12','Pendente',12);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (23.00,'2026-03-13','Pendente',13);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (24.00,'2026-03-14','Pendente',14);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (25.00,'2026-03-15','Pendente',15);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (26.00,'2026-03-16','Pendente',16);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (27.00,'2026-03-17','Pendente',17);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (28.00,'2026-03-18','Pendente',18);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (29.00,'2026-03-19','Pendente',19);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (30.00,'2026-03-20','Pendente',20);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (31.00,'2026-03-21','Pendente',21);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (32.00,'2026-03-22','Pendente',22);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (33.00,'2026-03-23','Pendente',23);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (34.00,'2026-03-24','Pendente',24);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (35.00,'2026-03-25','Pendente',25);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (36.00,'2026-03-26','Pendente',26);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (37.00,'2026-03-27','Pendente',27);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (38.00,'2026-03-28','Pendente',28);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (39.00,'2026-03-01','Pendente',29);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (40.00,'2026-03-02','Pendente',30);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (41.00,'2026-03-03','Pendente',31);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (42.00,'2026-03-04','Pendente',32);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (43.00,'2026-03-05','Pendente',33);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (44.00,'2026-03-06','Pendente',34);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (45.00,'2026-03-07','Pendente',35);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (46.00,'2026-03-08','Pendente',36);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (47.00,'2026-03-09','Pendente',37);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (48.00,'2026-03-10','Pendente',38);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (49.00,'2026-03-11','Pendente',39);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (50.00,'2026-03-12','Pendente',40);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (51.00,'2026-03-13','Pendente',41);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (52.00,'2026-03-14','Pendente',42);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (53.00,'2026-03-15','Pendente',43);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (54.00,'2026-03-16','Pendente',44);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (55.00,'2026-03-17','Pendente',45);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (56.00,'2026-03-18','Pendente',46);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (57.00,'2026-03-19','Pendente',47);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (58.00,'2026-03-20','Pendente',48);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (59.00,'2026-03-21','Pendente',49);
+INSERT INTO Multa (valor,data_multa,status_pagamento,id_emprestimo) VALUES (60.00,'2026-03-22','Pendente',50);
