@@ -1,0 +1,556 @@
+CREATE DATABASE autoprime;
+USE autoprime;
+
+CREATE TABLE Cliente (
+id_Cliente INT AUTO_INCREMENT PRIMARY KEY,
+nome VARCHAR(50),
+email VARCHAR(50),
+senha VARCHAR(99),
+CPF CHAR (20),
+
+CONSTRAINT uc_email
+UNIQUE (email),
+CONSTRAINT uc_CPF
+UNIQUE (CPF),
+CONSTRAINT uc_senha
+UNIQUE (senha)
+);
+
+CREATE TABLE Test (
+id_test INT AUTO_INCREMENT PRIMARY KEY,
+data DATE,
+hora TIME,
+id_cliente INT,
+id_veiculo INT,
+
+FOREIGN KEY (id_cliente)
+REFERENCES Cliente(id_cliente)
+);
+
+CREATE TABLE Veiculo ( 
+id_veiculo INT AUTO_INCREMENT PRIMARY KEY,
+marca VARCHAR(50),
+modelo VARCHAR(50),
+ano DATE,
+cor VARCHAR (50),
+tipo VARCHAR (20),
+preco DECIMAL,
+status_venda VARCHAR (50)
+);
+
+CREATE TABLE Ordem (
+id_ordem INT AUTO_INCREMENT PRIMARY KEY,
+data_abertura DATE,
+data_fechamento DATE,
+descricao VARCHAR (50),
+valor_total DECIMAL,
+status VARCHAR (50),
+id_cliente INT,
+id_veiculo INT,
+id_mecanico INT,
+
+FOREIGN KEY (id_cliente)
+REFERENCES Cliente(id_cliente),
+
+FOREIGN KEY (id_veiculo)
+REFERENCES Veiculo(id_veiculo),
+
+FOREIGN KEY (id_mecanico)
+REFERENCES Mecanico(id_mecanico)
+);
+
+CREATE TABLE Mecanico (
+id_mecanico INT AUTO_INCREMENT PRIMARY KEY,
+nome VARCHAR (100),
+especialidade VARCHAR(30),
+telefone CHAR (20),
+
+CONSTRAINT uc_telefone
+UNIQUE (telefone)
+);
+
+CREATE TABLE Item_Ordem (
+id_item INT AUTO_INCREMENT PRIMARY KEY,
+quantidade INT,
+valor DECIMAL,
+id_ordem INT,
+id_peca INT,
+
+FOREIGN KEY (id_ordem)
+REFERENCES Ordem(id_ordem),
+FOREIGN KEY (id_peca)
+REFERENCES peca(id_peca)
+);
+
+CREATE TABLE peca (
+id_peca INT AUTO_INCREMENT PRIMARY KEY,
+nome VARCHAR (50),
+descricao VARCHAR (50),
+preco DECIMAL,
+quantidade VARCHAR (500)
+);
+
+ALTER TABLE Cliente
+ADD status_ativo BOOLEAN;
+
+ALTER TABLE Veiculo
+ADD data_cadastro DATETIME;
+
+ALTER TABLE Test
+ADD observacoes VARCHAR(200);
+
+ALTER TABLE Mecanico
+ADD status_ativo BOOLEAN;
+
+ALTER TABLE Ordem
+ADD usuario_alteracao VARCHAR(50);
+
+ALTER TABLE Peca
+ADD fornecedor VARCHAR(100);
+
+ALTER TABLE Item_Ordem
+ADD data_registro DATE;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirCliente(
+
+IN p_nome VARCHAR(50),
+IN p_email VARCHAR(50),
+IN p_senha VARCHAR(99),
+IN p_cpf CHAR(20)
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Cliente WHERE email=p_email) THEN
+
+SELECT 'Cliente já cadastrado.';
+
+ELSE
+
+INSERT INTO Cliente(nome,email,senha,CPF)
+VALUES(p_nome,p_email,p_senha,p_cpf);
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirVeiculo(
+
+IN p_marca VARCHAR(50),
+IN p_modelo VARCHAR(50),
+IN p_ano DATE,
+IN p_cor VARCHAR(50),
+IN p_tipo VARCHAR(20),
+IN p_preco DECIMAL(10,2)
+
+)
+BEGIN
+
+IF p_preco > 0 THEN
+
+INSERT INTO Veiculo
+(marca,modelo,ano,cor,tipo,preco,status_venda)
+
+VALUES
+(p_marca,p_modelo,p_ano,p_cor,p_tipo,p_preco,'Disponível');
+
+ELSE
+
+SELECT 'Preço inválido.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE AgendarTestDrive(
+
+IN p_data DATE,
+IN p_hora TIME,
+IN p_cliente INT,
+IN p_veiculo INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Cliente WHERE id_cliente=p_cliente)
+AND EXISTS(SELECT * FROM Veiculo WHERE id_veiculo=p_veiculo) THEN
+
+INSERT INTO Test(data,hora,id_cliente,id_veiculo)
+
+VALUES
+(p_data,p_hora,p_cliente,p_veiculo);
+
+ELSE
+
+SELECT 'Cliente ou veículo inexistente.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirMecanico(
+
+IN p_nome VARCHAR(100),
+IN p_especialidade VARCHAR(30),
+IN p_telefone CHAR(20)
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Mecanico WHERE telefone=p_telefone) THEN
+
+SELECT 'Telefone já cadastrado.';
+
+ELSE
+
+INSERT INTO Mecanico
+(nome,especialidade,telefone)
+
+VALUES
+(p_nome,p_especialidade,p_telefone);
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE CriarOrdem(
+
+IN p_data DATE,
+IN p_descricao VARCHAR(50),
+IN p_cliente INT,
+IN p_veiculo INT,
+IN p_mecanico INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Cliente WHERE id_cliente=p_cliente)
+AND EXISTS(SELECT * FROM Veiculo WHERE id_veiculo=p_veiculo)
+AND EXISTS(SELECT * FROM Mecanico WHERE id_mecanico=p_mecanico) THEN
+
+INSERT INTO Ordem
+(data_abertura,descricao,status,id_cliente,id_veiculo,id_mecanico)
+
+VALUES
+(p_data,p_descricao,'Aberta',p_cliente,p_veiculo,p_mecanico);
+
+ELSE
+
+SELECT 'Dados inválidos.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirPeca(
+
+IN p_nome VARCHAR(50),
+IN p_descricao VARCHAR(50),
+IN p_preco DECIMAL(10,2),
+IN p_quantidade VARCHAR(500)
+
+)
+BEGIN
+
+IF p_preco > 0 THEN
+
+INSERT INTO Peca
+(nome,descricao,preco,quantidade)
+
+VALUES
+(p_nome,p_descricao,p_preco,p_quantidade);
+
+ELSE
+
+SELECT 'Preço inválido.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE AdicionarItemOrdem(
+
+IN p_quantidade VARCHAR(50),
+IN p_valor DECIMAL(10,2),
+IN p_ordem INT,
+IN p_peca INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Ordem WHERE id_ordem=p_ordem)
+AND EXISTS(SELECT * FROM Peca WHERE id_peca=p_peca) THEN
+
+INSERT INTO Item_Ordem
+(quantidade,valor,id_ordem,id_peca)
+
+VALUES
+(p_quantidade,p_valor,p_ordem,p_peca);
+
+ELSE
+
+SELECT 'Ordem ou peça inexistente.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_reservar_veiculo
+AFTER INSERT ON Test
+FOR EACH ROW
+BEGIN
+
+UPDATE Veiculo
+SET status_venda = 'Reservado para Test Drive'
+WHERE id_veiculo = NEW.id_veiculo;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_baixar_estoque_peca
+AFTER INSERT ON Item_Ordem
+FOR EACH ROW
+BEGIN
+
+UPDATE Peca
+SET quantidade = quantidade - NEW.quantidade
+WHERE id_peca = NEW.id_peca;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_verificar_estoque_peca
+BEFORE INSERT ON Item_Ordem
+FOR EACH ROW
+BEGIN
+
+DECLARE v_quantidade INT;
+
+SELECT quantidade
+INTO v_quantidade
+FROM Peca
+WHERE id_peca = NEW.id_peca;
+
+IF NEW.quantidade > v_quantidade THEN
+
+SIGNAL SQLSTATE '45000'
+SET MESSAGE_TEXT = 'Quantidade em estoque insuficiente.';
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 25','Descricao 25',35.00,100,'Fornecedor 25');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 26','Descricao 26',36.00,100,'Fornecedor 26');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 27','Descricao 27',37.00,100,'Fornecedor 27');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 28','Descricao 28',38.00,100,'Fornecedor 28');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 29','Descricao 29',39.00,100,'Fornecedor 29');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 30','Descricao 30',40.00,100,'Fornecedor 30');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 31','Descricao 31',41.00,100,'Fornecedor 31');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 32','Descricao 32',42.00,100,'Fornecedor 32');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 33','Descricao 33',43.00,100,'Fornecedor 33');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 34','Descricao 34',44.00,100,'Fornecedor 34');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 35','Descricao 35',45.00,100,'Fornecedor 35');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 36','Descricao 36',46.00,100,'Fornecedor 36');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 37','Descricao 37',47.00,100,'Fornecedor 37');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 38','Descricao 38',48.00,100,'Fornecedor 38');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 39','Descricao 39',49.00,100,'Fornecedor 39');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 40','Descricao 40',50.00,100,'Fornecedor 40');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 41','Descricao 41',51.00,100,'Fornecedor 41');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 42','Descricao 42',52.00,100,'Fornecedor 42');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 43','Descricao 43',53.00,100,'Fornecedor 43');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 44','Descricao 44',54.00,100,'Fornecedor 44');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 45','Descricao 45',55.00,100,'Fornecedor 45');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 46','Descricao 46',56.00,100,'Fornecedor 46');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 47','Descricao 47',57.00,100,'Fornecedor 47');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 48','Descricao 48',58.00,100,'Fornecedor 48');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 49','Descricao 49',59.00,100,'Fornecedor 49');
+INSERT INTO Peca(nome,descricao,preco,quantidade,fornecedor) VALUES ('Peca 50','Descricao 50',60.00,100,'Fornecedor 50');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-01','10:00:00',1,1,'Teste 1');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-02','10:00:00',2,2,'Teste 2');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-03','10:00:00',3,3,'Teste 3');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-04','10:00:00',4,4,'Teste 4');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-05','10:00:00',5,5,'Teste 5');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-06','10:00:00',6,6,'Teste 6');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-07','10:00:00',7,7,'Teste 7');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-08','10:00:00',8,8,'Teste 8');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-09','10:00:00',9,9,'Teste 9');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-10','10:00:00',10,10,'Teste 10');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-11','10:00:00',11,11,'Teste 11');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-12','10:00:00',12,12,'Teste 12');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-13','10:00:00',13,13,'Teste 13');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-14','10:00:00',14,14,'Teste 14');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-15','10:00:00',15,15,'Teste 15');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-16','10:00:00',16,16,'Teste 16');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-17','10:00:00',17,17,'Teste 17');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-18','10:00:00',18,18,'Teste 18');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-19','10:00:00',19,19,'Teste 19');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-20','10:00:00',20,20,'Teste 20');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-21','10:00:00',21,21,'Teste 21');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-22','10:00:00',22,22,'Teste 22');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-23','10:00:00',23,23,'Teste 23');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-24','10:00:00',24,24,'Teste 24');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-25','10:00:00',25,25,'Teste 25');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-26','10:00:00',26,26,'Teste 26');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-27','10:00:00',27,27,'Teste 27');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-28','10:00:00',28,28,'Teste 28');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-01','10:00:00',29,29,'Teste 29');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-02','10:00:00',30,30,'Teste 30');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-03','10:00:00',31,31,'Teste 31');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-04','10:00:00',32,32,'Teste 32');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-05','10:00:00',33,33,'Teste 33');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-06','10:00:00',34,34,'Teste 34');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-07','10:00:00',35,35,'Teste 35');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-08','10:00:00',36,36,'Teste 36');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-09','10:00:00',37,37,'Teste 37');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-10','10:00:00',38,38,'Teste 38');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-11','10:00:00',39,39,'Teste 39');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-12','10:00:00',40,40,'Teste 40');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-13','10:00:00',41,41,'Teste 41');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-14','10:00:00',42,42,'Teste 42');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-15','10:00:00',43,43,'Teste 43');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-16','10:00:00',44,44,'Teste 44');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-17','10:00:00',45,45,'Teste 45');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-18','10:00:00',46,46,'Teste 46');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-19','10:00:00',47,47,'Teste 47');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-20','10:00:00',48,48,'Teste 48');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-21','10:00:00',49,49,'Teste 49');
+INSERT INTO Test(data,hora,id_cliente,id_veiculo,observacoes) VALUES ('2026-07-22','10:00:00',50,50,'Teste 50');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 1',0,'Aberta',1,1,1,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 2',0,'Aberta',2,2,2,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 3',0,'Aberta',3,3,3,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 4',0,'Aberta',4,4,4,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 5',0,'Aberta',5,5,5,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 6',0,'Aberta',6,6,6,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 7',0,'Aberta',7,7,7,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 8',0,'Aberta',8,8,8,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 9',0,'Aberta',9,9,9,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 10',0,'Aberta',10,10,10,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 11',0,'Aberta',11,11,11,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 12',0,'Aberta',12,12,12,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 13',0,'Aberta',13,13,13,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 14',0,'Aberta',14,14,14,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 15',0,'Aberta',15,15,15,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 16',0,'Aberta',16,16,16,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 17',0,'Aberta',17,17,17,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 18',0,'Aberta',18,18,18,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 19',0,'Aberta',19,19,19,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 20',0,'Aberta',20,20,20,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 21',0,'Aberta',21,21,21,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 22',0,'Aberta',22,22,22,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 23',0,'Aberta',23,23,23,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 24',0,'Aberta',24,24,24,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 25',0,'Aberta',25,25,25,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 26',0,'Aberta',26,26,26,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 27',0,'Aberta',27,27,27,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 28',0,'Aberta',28,28,28,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 29',0,'Aberta',29,29,29,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 30',0,'Aberta',30,30,30,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 31',0,'Aberta',31,31,31,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 32',0,'Aberta',32,32,32,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 33',0,'Aberta',33,33,33,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 34',0,'Aberta',34,34,34,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 35',0,'Aberta',35,35,35,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 36',0,'Aberta',36,36,36,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 37',0,'Aberta',37,37,37,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 38',0,'Aberta',38,38,38,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 39',0,'Aberta',39,39,39,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 40',0,'Aberta',40,40,40,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 41',0,'Aberta',41,41,41,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 42',0,'Aberta',42,42,42,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 43',0,'Aberta',43,43,43,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 44',0,'Aberta',44,44,44,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 45',0,'Aberta',45,45,45,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 46',0,'Aberta',46,46,46,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 47',0,'Aberta',47,47,47,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 48',0,'Aberta',48,48,48,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 49',0,'Aberta',49,49,49,'admin');
+INSERT INTO Ordem(data_abertura,data_fechamento,descricao,valor_total,status,id_cliente,id_veiculo,id_mecanico,usuario_alteracao) VALUES ('2026-07-01',NULL,'Ordem 50',0,'Aberta',50,50,50,'admin');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,12.00,1,1,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,13.00,2,2,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,14.00,3,3,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,15.00,4,4,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,16.00,5,5,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,17.00,6,6,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,18.00,7,7,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,19.00,8,8,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,20.00,9,9,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,21.00,10,10,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,22.00,11,11,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,23.00,12,12,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,24.00,13,13,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,25.00,14,14,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,26.00,15,15,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,27.00,16,16,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,28.00,17,17,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,29.00,18,18,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,30.00,19,19,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,31.00,20,20,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,32.00,21,21,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,33.00,22,22,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,34.00,23,23,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,35.00,24,24,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,36.00,25,25,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,37.00,26,26,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,38.00,27,27,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,39.00,28,28,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,40.00,29,29,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,41.00,30,30,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,42.00,31,31,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,43.00,32,32,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,44.00,33,33,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,45.00,34,34,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,46.00,35,35,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,47.00,36,36,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,48.00,37,37,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,49.00,38,38,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,50.00,39,39,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,51.00,40,40,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,52.00,41,41,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,53.00,42,42,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,54.00,43,43,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,55.00,44,44,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,56.00,45,45,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,57.00,46,46,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,58.00,47,47,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,59.00,48,48,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,60.00,49,49,'2026-07-01');
+INSERT INTO Item_Ordem(quantidade,valor,id_ordem,id_peca,data_registro) VALUES (1,61.00,50,50,'2026-07-01');
