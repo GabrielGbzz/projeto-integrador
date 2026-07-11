@@ -1,0 +1,728 @@
+CREATE DATABASE EcoStyle;
+USE EcoStyle;
+
+CREATE TABLE Cliente (
+    id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100),
+    email VARCHAR(100),
+    endereco VARCHAR(255),
+    
+    CONSTRAINT uc_endereco
+    UNIQUE (endereco)
+);
+
+CREATE TABLE Produto (
+    id_produto INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100),
+    descricao TEXT,
+    preco DECIMAL(10,2),
+    categoria VARCHAR(50),
+    material_ecologico BOOLEAN,
+    stock INT
+);
+
+CREATE TABLE Fornecedor (
+    id_fornecedor INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100),
+    empresa VARCHAR(100),
+    telefone VARCHAR(20),
+    email VARCHAR(100),
+    tipo_material_reciclado VARCHAR(100)
+);
+
+CREATE TABLE Pedido (
+    id_pedido INT AUTO_INCREMENT PRIMARY KEY,
+    data_pedido DATE,
+    valor_total DECIMAL(10,2),
+    status VARCHAR(50),
+    id_cliente INT,
+
+    FOREIGN KEY (id_cliente)
+	REFERENCES Cliente(id_cliente)
+       
+);
+
+CREATE TABLE Item_Pedido (
+    id_item INT AUTO_INCREMENT PRIMARY KEY,
+    quantidade INT NOT NULL,
+    preco_unitario DECIMAL(10,2) NOT NULL,
+    id_pedido INT NOT NULL,
+    id_produto INT NOT NULL,
+
+    FOREIGN KEY (id_pedido)
+	REFERENCES Pedido(id_pedido),
+        
+    FOREIGN KEY (id_produto)
+	REFERENCES Produto(id_produto)
+        
+        
+);
+
+CREATE TABLE Entrega (
+    id_entrega INT AUTO_INCREMENT PRIMARY KEY,
+    data_envio DATE,
+    data_entrega DATE,
+    transportadora VARCHAR(100),
+    carbono_neutro BOOLEAN,
+    id_pedido INT,
+
+    FOREIGN KEY (id_pedido)
+	REFERENCES Pedido(id_pedido)
+        
+);
+
+CREATE TABLE Devolucao (
+    id_devolucao INT AUTO_INCREMENT PRIMARY KEY,
+    data_devolucao DATE,
+    motivo VARCHAR(255),
+    status VARCHAR(50),
+    id_pedido INT,
+
+    FOREIGN KEY (id_pedido)
+	REFERENCES Pedido(id_pedido)
+      
+);
+
+ALTER TABLE Cliente
+ADD status_ativo BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE Produto
+ADD data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE Fornecedor
+ADD observacoes VARCHAR(200);
+
+ALTER TABLE Pedido
+ADD usuario_alteracao VARCHAR(50);
+
+ALTER TABLE Item_Pedido
+ADD observacoes VARCHAR(150);
+
+ALTER TABLE Entrega
+ADD data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE Devolucao
+ADD usuario_alteracao VARCHAR(50);
+
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirCliente(
+
+IN p_nome VARCHAR(100),
+IN p_email VARCHAR(100),
+IN p_endereco VARCHAR(150)
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Cliente WHERE email=p_email) THEN
+
+SELECT 'Cliente já existe.' AS Mensagem;
+
+ELSE
+
+INSERT INTO Cliente(nome,email,endereco)
+VALUES(p_nome,p_email,p_endereco);
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirProduto(
+
+IN p_nome VARCHAR(100),
+IN p_desc TEXT,
+IN p_preco DECIMAL(10,2),
+IN p_categoria VARCHAR(50)
+
+)
+BEGIN
+
+IF p_preco > 0 THEN
+
+INSERT INTO Produto(nome,descricao,preco,categoria)
+VALUES(p_nome,p_desc,p_preco,p_categoria);
+
+ELSE
+
+SELECT 'Preço inválido.' AS Mensagem;
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirFornecedor(
+
+IN p_nome VARCHAR(100),
+IN p_empresa VARCHAR(100),
+IN p_email VARCHAR(100)
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Fornecedor WHERE email=p_email) THEN
+
+SELECT 'Fornecedor já existe.';
+
+ELSE
+
+INSERT INTO Fornecedor(nome,empresa,email)
+VALUES(p_nome,p_empresa,p_email);
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE CriarPedido(
+
+IN p_data DATE,
+IN p_total DECIMAL(10,2),
+IN p_cliente INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Cliente WHERE id_cliente=p_cliente) THEN
+
+INSERT INTO Pedido(data_pedido,valor_total,status,id_cliente)
+VALUES(p_data,p_total,'Pendente',p_cliente);
+
+ELSE
+
+SELECT 'Cliente não encontrado.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE AdicionarItem(
+
+IN p_quantidade INT,
+IN p_preco DECIMAL(10,2),
+IN p_pedido INT,
+IN p_produto INT
+
+)
+BEGIN
+
+DECLARE estoque INT;
+
+SELECT stock
+INTO estoque
+FROM Produto
+WHERE id_produto=p_produto;
+
+IF estoque >= p_quantidade THEN
+
+INSERT INTO Item_Pedido
+(quantidade,preco_unitario,id_pedido,id_produto)
+VALUES(p_quantidade,p_preco,p_pedido,p_produto);
+
+UPDATE Produto
+SET stock = stock - p_quantidade
+WHERE id_produto=p_produto;
+
+ELSE
+
+SELECT 'Stock insuficiente.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE RegistrarEntrega(
+
+IN p_envio DATE,
+IN p_entrega DATE,
+IN p_transportadora VARCHAR(100),
+IN p_pedido INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Pedido WHERE id_pedido=p_pedido) THEN
+
+INSERT INTO Entrega
+(data_envio,data_entrega,transportadora,carbono_neutro,id_pedido)
+
+VALUES
+(p_envio,p_entrega,p_transportadora,TRUE,p_pedido);
+
+ELSE
+
+SELECT 'Pedido não encontrado.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE RegistrarDevolucao(
+
+IN p_data DATE,
+IN p_motivo VARCHAR(255),
+IN p_pedido INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Pedido WHERE id_pedido=p_pedido) THEN
+
+INSERT INTO Devolucao
+(data_devolucao,motivo,status,id_pedido)
+
+VALUES
+(p_data,p_motivo,'Em análise',p_pedido);
+
+ELSE
+
+SELECT 'Pedido inexistente.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_baixar_estoque
+AFTER INSERT ON Item_Pedido
+FOR EACH ROW
+BEGIN
+
+UPDATE Produto
+SET stock = stock - NEW.quantidade
+WHERE id_produto = NEW.id_produto;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_verificar_estoque
+BEFORE INSERT ON Item_Pedido
+FOR EACH ROW
+BEGIN
+
+DECLARE v_stock INT;
+
+SELECT stock
+INTO v_stock
+FROM Produto
+WHERE id_produto = NEW.id_produto;
+
+IF NEW.quantidade > v_stock THEN
+
+SIGNAL SQLSTATE '45000'
+SET MESSAGE_TEXT = 'Estoque insuficiente para realizar a venda.';
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_atualizar_status_pedido
+AFTER INSERT ON Entrega
+FOR EACH ROW
+BEGIN
+
+UPDATE Pedido
+SET status = 'Enviado'
+WHERE id_pedido = NEW.id_pedido;
+
+END $$
+
+DELIMITER ;
+
+INSERT INTO Cliente (nome, email, endereco) VALUES
+('João Silva', 'joao1@email.com', 'Rua A, 10'),
+('Maria Souza', 'maria2@email.com', 'Rua B, 20'),
+('Pedro Santos', 'pedro3@email.com', 'Rua C, 30'),
+('Ana Oliveira', 'ana4@email.com', 'Rua D, 40'),
+('Carlos Lima', 'carlos5@email.com', 'Rua E, 50'),
+('Fernanda Costa', 'fernanda6@email.com', 'Rua F, 60'),
+('Lucas Pereira', 'lucas7@email.com', 'Rua G, 70'),
+('Juliana Rocha', 'juliana8@email.com', 'Rua H, 80'),
+('Rafael Gomes', 'rafael9@email.com', 'Rua I, 90'),
+('Patrícia Alves', 'patricia10@email.com', 'Rua J, 100'),
+('Bruno Martins', 'bruno11@email.com', 'Rua K, 110'),
+('Camila Fernandes', 'camila12@email.com', 'Rua L, 120'),
+('Diego Ribeiro', 'diego13@email.com', 'Rua M, 130'),
+('Larissa Melo', 'larissa14@email.com', 'Rua N, 140'),
+('Gabriel Carvalho', 'gabriel15@email.com', 'Rua O, 150'),
+('Amanda Nunes', 'amanda16@email.com', 'Rua P, 160'),
+('Felipe Castro', 'felipe17@email.com', 'Rua Q, 170'),
+('Beatriz Araújo', 'beatriz18@email.com', 'Rua R, 180'),
+('Rodrigo Moraes', 'rodrigo19@email.com', 'Rua S, 190'),
+('Natália Freitas', 'natalia20@email.com', 'Rua T, 200'),
+('Eduardo Barbosa', 'eduardo21@email.com', 'Rua U, 210'),
+('Mariana Pinto', 'mariana22@email.com', 'Rua V, 220'),
+('Ricardo Dias', 'ricardo23@email.com', 'Rua W, 230'),
+('Aline Teixeira', 'aline24@email.com', 'Rua X, 240'),
+('Vinicius Lopes', 'vinicius25@email.com', 'Rua Y, 250'),
+('Carolina Ramos', 'carolina26@email.com', 'Rua Z, 260'),
+('Gustavo Vieira', 'gustavo27@email.com', 'Rua Alfa, 270'),
+('Renata Campos', 'renata28@email.com', 'Rua Beta, 280'),
+('Thiago Mendes', 'thiago29@email.com', 'Rua Gama, 290'),
+('Priscila Moura', 'priscila30@email.com', 'Rua Delta, 300'),
+('Leonardo Silva', 'leonardo31@email.com', 'Rua Épsilon, 310'),
+('Vanessa Farias', 'vanessa32@email.com', 'Rua Zeta, 320'),
+('Henrique Duarte', 'henrique33@email.com', 'Rua Eta, 330'),
+('Tatiane Correia', 'tatiane34@email.com', 'Rua Teta, 340'),
+('Paulo Henrique', 'paulo35@email.com', 'Rua Iota, 350'),
+('Bianca Lopes', 'bianca36@email.com', 'Rua Kappa, 360'),
+('André Matos', 'andre37@email.com', 'Rua Lambda, 370'),
+('Isabela Cruz', 'isabela38@email.com', 'Rua Mu, 380'),
+('Daniel Moreira', 'daniel39@email.com', 'Rua Nu, 390'),
+('Sabrina Rocha', 'sabrina40@email.com', 'Rua Xi, 400'),
+('Marcelo Batista', 'marcelo41@email.com', 'Rua Ômicron, 410'),
+('Elaine Reis', 'elaine42@email.com', 'Rua Pi, 420'),
+('Fábio Cardoso', 'fabio43@email.com', 'Rua Rô, 430'),
+('Débora Mendes', 'debora44@email.com', 'Rua Sigma, 440'),
+('Igor Souza', 'igor45@email.com', 'Rua Tau, 450'),
+('Paula Fernandes', 'paula46@email.com', 'Rua Upsilon, 460'),
+('César Almeida', 'cesar47@email.com', 'Rua Phi, 470'),
+('Mônica Barros', 'monica48@email.com', 'Rua Chi, 480'),
+('Roberto Cunha', 'roberto49@email.com', 'Rua Psi, 490'),
+('Kelly Rodrigues', 'kelly50@email.com', 'Rua Ômega, 500');
+
+INSERT INTO Produto (nome, descricao, preco, categoria, material_ecologico, stock) VALUES
+('Camiseta Eco Branca','Camiseta de algodão orgânico',49.90, 'Vestuário', TRUE, 100),
+('Camiseta Eco Preta','Camiseta sustentável',52.90,'Vestuário',TRUE,95),
+('Calça Jeans Reciclada','Jeans produzido com fibras recicladas',129.90,'Vestuário',TRUE,60),
+('Jaqueta Verde','Jaqueta ecológica impermeável',199.90,'Vestuário',TRUE,40),
+('Tênis Sustentável','Tênis com material reciclado',249.90,'Calçados',TRUE,50),
+('Sandália Eco','Sandália produzida com borracha reciclada',89.90,'Calçados',TRUE,80),
+('Mochila Ecológica','Mochila feita com garrafas PET',159.90,'Acessórios',TRUE,45),
+('Bolsa Natural','Bolsa em algodão reciclado',119.90,'Acessórios',TRUE,55),
+('Carteira Eco','Carteira de couro vegetal',79.90,'Acessórios',TRUE,70),
+('Boné Sustentável','Boné em algodão orgânico',39.90,'Acessórios',TRUE,90),
+('Garrafa Térmica','Garrafa reutilizável inox',69.90,'Utilidades',TRUE,120),
+('Caneca Bamboo','Caneca feita em bambu',35.90,'Utilidades',TRUE,110),
+('Escova Bamboo','Escova dental ecológica',12.90,'Higiene',TRUE,200),
+('Kit Higiene Eco','Kit sustentável de higiene',59.90,'Higiene',TRUE,85),
+('Sabonete Natural','Sabonete vegano artesanal',18.90,'Higiene',TRUE,140),
+('Shampoo Sólido','Shampoo ecológico',27.90,'Higiene',TRUE,100),
+('Condicionador Sólido','Condicionador sustentável',29.90,'Higiene',TRUE,90),
+('Sacola Reutilizável','Sacola ecológica',14.90,'Utilidades',TRUE,300),
+('Copo Retrátil','Copo reutilizável',25.90,'Utilidades',TRUE,160),
+('Prato Bambu','Prato biodegradável',19.90,'Utilidades',TRUE,130),
+('Talheres Eco','Talheres reutilizáveis',22.90,'Utilidades',TRUE,170),
+('Luminária Solar','Luminária sustentável',149.90,'Casa',TRUE,35),
+('Vaso Reciclado','Vaso produzido com plástico reciclado',45.90,'Casa',TRUE,60),
+('Tapete Fibra Natural','Tapete ecológico',139.90,'Casa',TRUE,25),
+('Almofada Orgânica','Almofada de algodão orgânico',59.90,'Casa',TRUE,50),
+('Caderno Reciclado','Caderno de papel reciclado',24.90,'Papelaria',TRUE,180),
+('Agenda Eco','Agenda sustentável',34.90,'Papelaria',TRUE,90),
+('Lápis Reciclado','Lápis ecológico',3.90,'Papelaria',TRUE,500),
+('Caneta Bambu','Caneta biodegradável',8.90,'Papelaria',TRUE,350),
+('Estojo Reciclado','Estojo sustentável',29.90,'Papelaria',TRUE,70),
+('Blusa Orgânica','Blusa feminina sustentável',69.90,'Vestuário',TRUE,85),
+('Short Reciclado','Short ecológico',79.90,'Vestuário',TRUE,65),
+('Meia Algodão','Meia em algodão orgânico',19.90,'Vestuário',TRUE,140),
+('Cinto Vegano','Cinto em couro vegetal',54.90,'Acessórios',TRUE,75),
+('Pulseira Eco','Pulseira artesanal reciclada',18.90,'Acessórios',TRUE,95),
+('Colar Sustentável','Colar ecológico',44.90,'Acessórios',TRUE,55),
+('Relógio Madeira','Relógio de madeira reciclada',199.90,'Acessórios',TRUE,20),
+('Óculos Bamboo','Óculos sustentáveis',159.90,'Acessórios',TRUE,30),
+('Chapéu Natural','Chapéu ecológico',49.90,'Acessórios',TRUE,65),
+('Eco Bag Premium','Bolsa ecológica premium',69.90,'Acessórios',TRUE,80),
+('Toalha Orgânica','Toalha sustentável',89.90,'Casa',TRUE,50),
+('Lençol Algodão','Lençol orgânico',179.90,'Casa',TRUE,25),
+('Cobertor Reciclado','Cobertor ecológico',219.90,'Casa',TRUE,20),
+('Pano Multiuso','Pano reutilizável',15.90,'Casa',TRUE,150),
+('Esponja Vegetal','Esponja biodegradável',9.90,'Casa',TRUE,220),
+('Sabão Ecológico','Sabão biodegradável',16.90,'Limpeza',TRUE,170),
+('Detergente Natural','Detergente ecológico',14.90,'Limpeza',TRUE,180),
+('Desinfetante Verde','Desinfetante biodegradável',21.90,'Limpeza',TRUE,120),
+('Refil Sustentável','Refil ecológico para limpeza',17.90,'Limpeza',TRUE,130),
+('Kit Limpeza Eco','Kit completo sustentável',99.90,'Limpeza',TRUE,45);
+
+INSERT INTO Fornecedor (nome, empresa, telefone, email, tipo_material_reciclado) VALUES
+('Carlos Silva','EcoBrasil','11990000001','fornecedor1@eco.com','Plástico'),
+('Mariana Souza','GreenTech','11990000002','fornecedor2@eco.com','Vidro'),
+('João Pereira','Recicla Mais','11990000003','fornecedor3@eco.com','Papel'),
+('Fernanda Lima','EcoPlanet','11990000004','fornecedor4@eco.com','Metal'),
+('Ricardo Alves','Nature Life','11990000005','fornecedor5@eco.com','Borracha'),
+('Juliana Costa','Eco Future','11990000006','fornecedor6@eco.com','Algodão'),
+('Lucas Martins','BioTech','11990000007','fornecedor7@eco.com','Madeira'),
+('Amanda Rocha','Verde Vivo','11990000008','fornecedor8@eco.com','PET'),
+('Felipe Gomes','Recicla Brasil','11990000009','fornecedor9@eco.com','Plástico'),
+('Patrícia Santos','Mundo Verde','11990000010','fornecedor10@eco.com','Vidro'),
+('Bruno Oliveira','Eco Supply','11990000011','fornecedor11@eco.com','Papel'),
+('Camila Ribeiro','EcoHouse','11990000012','fornecedor12@eco.com','Metal'),
+('Gabriel Fernandes','Green Factory','11990000013','fornecedor13@eco.com','PET'),
+('Larissa Melo','Bio Nature','11990000014','fornecedor14@eco.com','Algodão'),
+('Rafael Carvalho','EcoWood','11990000015','fornecedor15@eco.com','Madeira'),
+('Natália Nunes','Recicla Fácil','11990000016','fornecedor16@eco.com','Plástico'),
+('Eduardo Castro','Eco Prime','11990000017','fornecedor17@eco.com','Vidro'),
+('Beatriz Araújo','Green World','11990000018','fornecedor18@eco.com','Metal'),
+('Vinicius Moraes','Eco Max','11990000019','fornecedor19@eco.com','Papel'),
+('Priscila Freitas','Natural Eco','11990000020','fornecedor20@eco.com','PET'),
+('Diego Barbosa','Eco Line','11990000021','fornecedor21@eco.com','Borracha'),
+('Tatiane Pinto','Planeta Verde','11990000022','fornecedor22@eco.com','Madeira'),
+('Leonardo Dias','Eco Center','11990000023','fornecedor23@eco.com','Algodão'),
+('Vanessa Teixeira','Green Plus','11990000024','fornecedor24@eco.com','Vidro'),
+('Henrique Lopes','Bio Green','11990000025','fornecedor25@eco.com','Plástico'),
+('Carolina Ramos','Eco Planet','11990000026','fornecedor26@eco.com','Metal'),
+('Igor Vieira','Reciclagem Total','11990000027','fornecedor27@eco.com','PET'),
+('Elaine Campos','Nature Eco','11990000028','fornecedor28@eco.com','Papel'),
+('Marcelo Moura','Eco Star','11990000029','fornecedor29@eco.com','Vidro'),
+('Bianca Correia','Green House','11990000030','fornecedor30@eco.com','Madeira'),
+('Paulo Mendes','Eco Industrial','11990000031','fornecedor31@eco.com','Plástico'),
+('Débora Farias','Eco Service','11990000032','fornecedor32@eco.com','Algodão'),
+('André Cruz','Bio Future','11990000033','fornecedor33@eco.com','Metal'),
+('Sabrina Moreira','Green Life','11990000034','fornecedor34@eco.com','Vidro'),
+('Roberto Batista','Eco Friends','11990000035','fornecedor35@eco.com','PET'),
+('Kelly Reis','Eco Brasil Sul','11990000036','fornecedor36@eco.com','Papel'),
+('Daniel Almeida','Recicla Fácil','11990000037','fornecedor37@eco.com','Madeira'),
+('Mônica Cardoso','Nature Supply','11990000038','fornecedor38@eco.com','Plástico'),
+('Fábio Cunha','Eco Ambiental','11990000039','fornecedor39@eco.com','Metal'),
+('Isabela Barros','Green Planet','11990000040','fornecedor40@eco.com','Vidro'),
+('Thiago Duarte','Eco Smart','11990000041','fornecedor41@eco.com','Algodão'),
+('Renata Rocha','Bio Planet','11990000042','fornecedor42@eco.com','PET'),
+('César Mendes','Eco Forte','11990000043','fornecedor43@eco.com','Madeira'),
+('Paula Silva','Eco Center BR','11990000044','fornecedor44@eco.com','Plástico'),
+('Rodrigo Matos','ReciclaTudo','11990000045','fornecedor45@eco.com','Vidro'),
+('Aline Fernandes','Eco Global','11990000046','fornecedor46@eco.com','Metal'),
+('Gustavo Costa','Green Eco','11990000047','fornecedor47@eco.com','Papel'),
+('Márcia Oliveira','Nature Brasil','11990000048','fornecedor48@eco.com','PET'),
+('Robson Lima','Eco Solution','11990000049','fornecedor49@eco.com','Madeira'),
+('Cristiane Pereira','Planeta Limpo','11990000050','fornecedor50@eco.com','Algodão');
+
+INSERT INTO Pedido (data_pedido, valor_total, status, id_cliente) VALUES
+('2026-01-01', 149.90, 'Pendente', 1),
+('2026-01-02', 89.90, 'Pendente', 2),
+('2026-01-03', 239.80, 'Pendente', 3),
+('2026-01-04', 59.90, 'Pendente', 4),
+('2026-01-05', 329.90, 'Pendente', 5),
+('2026-01-06', 79.90, 'Pendente', 6),
+('2026-01-07', 129.90, 'Pendente', 7),
+('2026-01-08', 49.90, 'Pendente', 8),
+('2026-01-09', 199.90, 'Pendente', 9),
+('2026-01-10', 99.90, 'Pendente', 10),
+('2026-01-11', 149.90, 'Pendente', 11),
+('2026-01-12', 189.90, 'Pendente', 12),
+('2026-01-13', 59.90, 'Pendente', 13),
+('2026-01-14', 89.90, 'Pendente', 14),
+('2026-01-15', 259.90, 'Pendente', 15),
+('2026-01-16', 69.90, 'Pendente', 16),
+('2026-01-17', 99.90, 'Pendente', 17),
+('2026-01-18', 149.90, 'Pendente', 18),
+('2026-01-19', 49.90, 'Pendente', 19),
+('2026-01-20', 179.90, 'Pendente', 20),
+('2026-01-21', 219.90, 'Pendente', 21),
+('2026-01-22', 34.90, 'Pendente', 22),
+('2026-01-23', 129.90, 'Pendente', 23),
+('2026-01-24', 69.90, 'Pendente', 24),
+('2026-01-25', 89.90, 'Pendente', 25),
+('2026-01-26', 159.90, 'Pendente', 26),
+('2026-01-27', 45.90, 'Pendente', 27),
+('2026-01-28', 99.90, 'Pendente', 28),
+('2026-01-29', 249.90, 'Pendente', 29),
+('2026-01-30', 39.90, 'Pendente', 30),
+('2026-01-31', 69.90, 'Pendente', 31),
+('2026-02-01', 119.90, 'Pendente', 32),
+('2026-02-02', 29.90, 'Pendente', 33),
+('2026-02-03', 54.90, 'Pendente', 34),
+('2026-02-04', 84.90, 'Pendente', 35),
+('2026-02-05', 139.90, 'Pendente', 36),
+('2026-02-06', 64.90, 'Pendente', 37),
+('2026-02-07', 99.90, 'Pendente', 38),
+('2026-02-08', 149.90, 'Pendente', 39),
+('2026-02-09', 219.90, 'Pendente', 40),
+('2026-02-10', 79.90, 'Pendente', 41),
+('2026-02-11', 109.90, 'Pendente', 42),
+('2026-02-12', 189.90, 'Pendente', 43),
+('2026-02-13', 59.90, 'Pendente', 44),
+('2026-02-14', 69.90, 'Pendente', 45),
+('2026-02-15', 249.90, 'Pendente', 46),
+('2026-02-16', 89.90, 'Pendente', 47),
+('2026-02-17', 129.90, 'Pendente', 48),
+('2026-02-18', 159.90, 'Pendente', 49),
+('2026-02-19', 99.90, 'Pendente', 50);
+
+INSERT INTO Item_Pedido (quantidade, preco_unitario, id_pedido, id_produto) VALUES
+(2, 49.90, 1, 1),
+(1, 52.90, 2, 2),
+(3, 129.90, 3, 3),
+(1, 199.90, 4, 4),
+(2, 249.90, 5, 5),
+(1, 89.90, 6, 6),
+(2, 159.90, 7, 7),
+(1, 119.90, 8, 8),
+(2, 79.90, 9, 9),
+(3, 39.90, 10, 10),
+(1, 69.90, 11, 11),
+(2, 35.90, 12, 12),
+(4, 12.90, 13, 13),
+(1, 59.90, 14, 14),
+(3, 18.90, 15, 15),
+(2, 27.90, 16, 16),
+(1, 29.90, 17, 17),
+(5, 14.90, 18, 18),
+(2, 25.90, 19, 19),
+(3, 19.90, 20, 20),
+(2, 22.90, 21, 21),
+(1, 149.90, 22, 22),
+(2, 45.90, 23, 23),
+(1, 139.90, 24, 24),
+(2, 59.90, 25, 25),
+(3, 24.90, 26, 26),
+(1, 34.90, 27, 27),
+(5, 3.90, 28, 28),
+(4, 8.90, 29, 29),
+(2, 29.90, 30, 30),
+(1, 69.90, 31, 31),
+(2, 79.90, 32, 32),
+(3, 19.90, 33, 33),
+(1, 54.90, 34, 34),
+(2, 18.90, 35, 35),
+(1, 44.90, 36, 36),
+(1, 199.90, 37, 37),
+(2, 159.90, 38, 38),
+(3, 49.90, 39, 39),
+(2, 69.90, 40, 40),
+(1, 89.90, 41, 41),
+(2, 179.90, 42, 42),
+(1, 219.90, 43, 43),
+(4, 15.90, 44, 44),
+(5, 9.90, 45, 45),
+(3, 16.90, 46, 46),
+(2, 14.90, 47, 47),
+(1, 21.90, 48, 48),
+(2, 17.90, 49, 49),
+(1, 99.90, 50, 50);
+
+INSERT INTO Entrega (data_envio, data_entrega, transportadora, carbono_neutro, id_pedido) VALUES
+('2026-01-02','2026-01-05','Correios',TRUE,1),
+('2026-01-03','2026-01-06','Jadlog',TRUE,2),
+('2026-01-04','2026-01-07','Loggi',FALSE,3),
+('2026-01-05','2026-01-08','Total Express',TRUE,4),
+('2026-01-06','2026-01-09','Correios',TRUE,5),
+('2026-01-07','2026-01-10','Jadlog',FALSE,6),
+('2026-01-08','2026-01-11','Loggi',TRUE,7),
+('2026-01-09','2026-01-12','Total Express',TRUE,8),
+('2026-01-10','2026-01-13','Correios',FALSE,9),
+('2026-01-11','2026-01-14','Jadlog',TRUE,10),
+('2026-01-12','2026-01-15','Loggi',TRUE,11),
+('2026-01-13','2026-01-16','Total Express',FALSE,12),
+('2026-01-14','2026-01-17','Correios',TRUE,13),
+('2026-01-15','2026-01-18','Jadlog',TRUE,14),
+('2026-01-16','2026-01-19','Loggi',FALSE,15),
+('2026-01-17','2026-01-20','Total Express',TRUE,16),
+('2026-01-18','2026-01-21','Correios',TRUE,17),
+('2026-01-19','2026-01-22','Jadlog',FALSE,18),
+('2026-01-20','2026-01-23','Loggi',TRUE,19),
+('2026-01-21','2026-01-24','Total Express',TRUE,20),
+('2026-01-22','2026-01-25','Correios',FALSE,21),
+('2026-01-23','2026-01-26','Jadlog',TRUE,22),
+('2026-01-24','2026-01-27','Loggi',TRUE,23),
+('2026-01-25','2026-01-28','Total Express',FALSE,24),
+('2026-01-26','2026-01-29','Correios',TRUE,25),
+('2026-01-27','2026-01-30','Jadlog',TRUE,26),
+('2026-01-28','2026-01-31','Loggi',FALSE,27),
+('2026-01-29','2026-02-01','Total Express',TRUE,28),
+('2026-01-30','2026-02-02','Correios',TRUE,29),
+('2026-01-31','2026-02-03','Jadlog',FALSE,30),
+('2026-02-01','2026-02-04','Loggi',TRUE,31),
+('2026-02-02','2026-02-05','Total Express',TRUE,32),
+('2026-02-03','2026-02-06','Correios',FALSE,33),
+('2026-02-04','2026-02-07','Jadlog',TRUE,34),
+('2026-02-05','2026-02-08','Loggi',TRUE,35),
+('2026-02-06','2026-02-09','Total Express',FALSE,36),
+('2026-02-07','2026-02-10','Correios',TRUE,37),
+('2026-02-08','2026-02-11','Jadlog',TRUE,38),
+('2026-02-09','2026-02-12','Loggi',FALSE,39),
+('2026-02-10','2026-02-13','Total Express',TRUE,40),
+('2026-02-11','2026-02-14','Correios',TRUE,41),
+('2026-02-12','2026-02-15','Jadlog',FALSE,42),
+('2026-02-13','2026-02-16','Loggi',TRUE,43),
+('2026-02-14','2026-02-17','Total Express',TRUE,44),
+('2026-02-15','2026-02-18','Correios',FALSE,45),
+('2026-02-16','2026-02-19','Jadlog',TRUE,46),
+('2026-02-17','2026-02-20','Loggi',TRUE,47),
+('2026-02-18','2026-02-21','Total Express',FALSE,48),
+('2026-02-19','2026-02-22','Correios',TRUE,49),
+('2026-02-20','2026-02-23','Jadlog',TRUE,50);
+
+INSERT INTO Devolucao (data_devolucao, motivo, status, id_pedido) VALUES
+('2026-02-10','Produto com defeito','Em análise',1),
+('2026-02-11','Tamanho incorreto','Aprovada',2),
+('2026-02-12','Arrependimento da compra','Recusada',3),
+('2026-02-13','Produto danificado','Em análise',4),
+('2026-02-14','Cor diferente da anunciada','Aprovada',5),
+('2026-02-15','Entrega incorreta','Em análise',6),
+('2026-02-16','Produto com defeito','Aprovada',7),
+('2026-02-17','Embalagem danificada','Recusada',8),
+('2026-02-18','Arrependimento da compra','Em análise',9),
+('2026-02-19','Produto incompleto','Aprovada',10),
+('2026-02-20','Produto com defeito','Em análise',11),
+('2026-02-21','Tamanho incorreto','Recusada',12),
+('2026-02-22','Produto danificado','Aprovada',13),
+('2026-02-23','Entrega incorreta','Em análise',14),
+('2026-02-24','Cor diferente da anunciada','Aprovada',15),
+('2026-02-25','Produto com defeito','Recusada',16),
+('2026-02-26','Embalagem danificada','Em análise',17),
+('2026-02-27','Arrependimento da compra','Aprovada',18),
+('2026-02-28','Produto incompleto','Em análise',19),
+('2026-03-01','Produto danificado','Recusada',20),
+('2026-03-02','Produto com defeito','Aprovada',21),
+('2026-03-03','Entrega incorreta','Em análise',22),
+('2026-03-04','Cor diferente da anunciada','Aprovada',23),
+('2026-03-05','Tamanho incorreto','Recusada',24),
+('2026-03-06','Produto danificado','Em análise',25),
+('2026-03-07','Produto incompleto','Aprovada',26),
+('2026-03-08','Produto com defeito','Em análise',27),
+('2026-03-09','Embalagem danificada','Recusada',28),
+('2026-03-10','Arrependimento da compra','Aprovada',29),
+('2026-03-11','Entrega incorreta','Em análise',30),
+('2026-03-12','Produto com defeito','Aprovada',31),
+('2026-03-13','Cor diferente da anunciada','Recusada',32),
+('2026-03-14','Produto danificado','Em análise',33),
+('2026-03-15','Tamanho incorreto','Aprovada',34),
+('2026-03-16','Produto incompleto','Em análise',35),
+('2026-03-17','Produto com defeito','Recusada',36),
+('2026-03-18','Entrega incorreta','Aprovada',37),
+('2026-03-19','Arrependimento da compra','Em análise',38),
+('2026-03-20','Produto danificado','Aprovada',39),
+('2026-03-21','Cor diferente da anunciada','Recusada',40),
+('2026-03-22','Produto com defeito','Em análise',41),
+('2026-03-23','Embalagem danificada','Aprovada',42),
+('2026-03-24','Produto incompleto','Recusada',43),
+('2026-03-25','Entrega incorreta','Em análise',44),
+('2026-03-26','Produto danificado','Aprovada',45),
+('2026-03-27','Arrependimento da compra','Em análise',46),
+('2026-03-28','Produto com defeito','Recusada',47),
+('2026-03-29','Tamanho incorreto','Aprovada',48),
+('2026-03-30','Cor diferente da anunciada','Em análise',49),
+('2026-03-31','Produto danificado','Aprovada',50);
