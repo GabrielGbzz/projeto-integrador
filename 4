@@ -1,0 +1,743 @@
+CREATE DATABASE tunestream;
+USE tunestream;
+
+CREATE TABLE Artista (
+id_artista INT AUTO_INCREMENT PRIMARY KEY,
+nome_artistico VARCHAR(50),
+pais VARCHAR(50),
+biografia VARCHAR(99),
+
+CONSTRAINT uc_biografia
+UNIQUE (biografia)
+);
+
+CREATE TABLE Album (
+id_album INT AUTO_INCREMENT PRIMARY KEY,
+titulo VARCHAR(50),
+data_lancamento DATE,
+genero VARCHAR(50),
+id_artista INT,
+
+FOREIGN KEY (id_artista)
+REFERENCES Artista(id_artista)
+);
+
+CREATE TABLE Audio ( 
+id_audio INT AUTO_INCREMENT PRIMARY KEY,
+titulo VARCHAR(50),
+duracao VARCHAR(50),
+tipo VARCHAR (50),
+numero_reproducoes VARCHAR (50),
+id_album INT,
+
+FOREIGN KEY (id_album)
+REFERENCES Album(id_album)
+);
+
+CREATE TABLE Royalty (
+id_royalty INT AUTO_INCREMENT PRIMARY KEY,
+valor DECIMAL (12,00),
+data_pagamento DATE,
+id_artista INT,
+id_audio INT,
+
+FOREIGN KEY (id_artista)
+REFERENCES Artista(id_artista),
+
+FOREIGN KEY (id_audio)
+REFERENCES Audio(id_audio)
+);
+
+CREATE TABLE Historico (
+id_historico INT AUTO_INCREMENT PRIMARY KEY,
+data_reproducao DATE,
+tempo_ouvido VARCHAR(30),
+
+id_audio INT,
+id_utilizador INT,
+
+FOREIGN KEY (id_utilizador)
+REFERENCES Utilizador(id_utilizador),
+FOREIGN KEY (id_audio)
+REFERENCES Audio(id_audio)
+);
+
+CREATE TABLE Utilizador (
+id_utilizador INT AUTO_INCREMENT PRIMARY KEY,
+nome VARCHAR (50),
+email VARCHAR (50),
+senha VARCHAR (50),
+tipo VARCHAR(20),
+data_registro DATE,
+
+CONSTRAINT uc_email
+UNIQUE (email),
+CONSTRAINT uc_senha
+UNIQUE (senha)
+);
+
+CREATE TABLE Playlist (
+id_playlist INT AUTO_INCREMENT PRIMARY KEY,
+nome VARCHAR (100),
+data_criacao DATE,
+
+id_utilizador INT,
+
+FOREIGN KEY (id_utilizador)
+REFERENCES Utilizador(id_utilizador)
+);
+
+ALTER TABLE Artista
+ADD status_ativo BOOLEAN;
+
+ALTER TABLE Album
+ADD data_criacao DATETIME;
+
+ALTER TABLE Audio
+ADD usuario_alteracao VARCHAR(50);
+
+ALTER TABLE Royalty
+ADD observacoes VARCHAR(200);
+
+ALTER TABLE Utilizador
+ADD status_ativo BOOLEAN;
+
+ALTER TABLE Historico
+ADD dispositivo VARCHAR(50);
+
+ALTER TABLE Playlist
+ADD descricao VARCHAR(150);
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirArtista(
+
+IN p_nome VARCHAR(50),
+IN p_pais VARCHAR(50),
+IN p_biografia VARCHAR(99)
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Artista WHERE biografia=p_biografia) THEN
+
+SELECT 'Artista já cadastrado.';
+
+ELSE
+
+INSERT INTO Artista(nome_artistico,pais,biografia)
+VALUES(p_nome,p_pais,p_biografia);
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirAlbum(
+
+IN p_titulo VARCHAR(50),
+IN p_data DATE,
+IN p_genero VARCHAR(50),
+IN p_artista INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Artista WHERE id_artista=p_artista) THEN
+
+INSERT INTO Album
+(titulo,data_lancamento,genero,id_artista)
+
+VALUES
+(p_titulo,p_data,p_genero,p_artista);
+
+ELSE
+
+SELECT 'Artista não encontrado.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirAudio(
+
+IN p_titulo VARCHAR(50),
+IN p_duracao VARCHAR(50),
+IN p_tipo VARCHAR(50),
+IN p_album INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Album WHERE id_album=p_album) THEN
+
+INSERT INTO Audio
+(titulo,duracao,tipo,numero_reproducoes,id_album)
+
+VALUES
+(p_titulo,p_duracao,p_tipo,'0',p_album);
+
+ELSE
+
+SELECT 'Álbum não encontrado.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE RegistrarRoyalty(
+
+IN p_valor DECIMAL(12,2),
+IN p_data DATE,
+IN p_artista INT,
+IN p_audio INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Artista WHERE id_artista=p_artista)
+AND EXISTS(SELECT * FROM Audio WHERE id_audio=p_audio) THEN
+
+INSERT INTO Royalty
+(valor,data_pagamento,id_artista,id_audio)
+
+VALUES
+(p_valor,p_data,p_artista,p_audio);
+
+ELSE
+
+SELECT 'Artista ou áudio inexistente.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirUtilizador(
+
+IN p_nome VARCHAR(50),
+IN p_email VARCHAR(50),
+IN p_senha VARCHAR(50),
+IN p_tipo VARCHAR(20),
+IN p_data DATE
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Utilizador WHERE email=p_email) THEN
+
+SELECT 'Email já cadastrado.';
+
+ELSE
+
+INSERT INTO Utilizador
+(nome,email,senha,tipo,data_registro)
+
+VALUES
+(p_nome,p_email,p_senha,p_tipo,p_data);
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE RegistrarHistorico(
+
+IN p_data DATE,
+IN p_tempo VARCHAR(30),
+IN p_audio INT,
+IN p_utilizador INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Audio WHERE id_audio=p_audio)
+AND EXISTS(SELECT * FROM Utilizador WHERE id_utilizador=p_utilizador) THEN
+
+INSERT INTO Historico
+(data_reproducao,tempo_ouvido,id_audio,id_utilizador)
+
+VALUES
+(p_data,p_tempo,p_audio,p_utilizador);
+
+UPDATE Audio
+SET numero_reproducoes = numero_reproducoes + 1
+WHERE id_audio=p_audio;
+
+ELSE
+
+SELECT 'Áudio ou utilizador inexistente.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE CriarPlaylist(
+
+IN p_nome VARCHAR(100),
+IN p_data DATE,
+IN p_utilizador INT
+
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Utilizador WHERE id_utilizador=p_utilizador) THEN
+
+INSERT INTO Playlist
+(nome,data_criacao,id_utilizador)
+
+VALUES
+(p_nome,p_data,p_utilizador);
+
+ELSE
+
+SELECT 'Utilizador não encontrado.';
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_incrementar_reproducoes
+AFTER INSERT ON Historico
+FOR EACH ROW
+BEGIN
+
+UPDATE Audio
+SET numero_reproducoes = numero_reproducoes + 1
+WHERE id_audio = NEW.id_audio;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_playlist_padrao
+AFTER INSERT ON Utilizador
+FOR EACH ROW
+BEGIN
+
+INSERT INTO Playlist
+(nome, data_criacao, id_utilizador)
+
+VALUES
+('Favoritas', CURDATE(), NEW.id_utilizador);
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_royalty_reproducao
+AFTER INSERT ON Historico
+FOR EACH ROW
+BEGIN
+
+INSERT INTO Royalty
+(valor, data_pagamento, id_artista, id_audio)
+
+SELECT
+0.05,
+CURDATE(),
+a.id_artista,
+NEW.id_audio
+FROM Audio au
+JOIN Album al
+ON au.id_album = al.id_album
+JOIN Artista a
+ON al.id_artista = a.id_artista
+WHERE au.id_audio = NEW.id_audio;
+
+END $$
+
+DELIMITER ;
+
+-- Artista
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 1','Brasil','Biografia exclusiva 1');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 2','Brasil','Biografia exclusiva 2');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 3','Brasil','Biografia exclusiva 3');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 4','Brasil','Biografia exclusiva 4');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 5','Brasil','Biografia exclusiva 5');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 6','Brasil','Biografia exclusiva 6');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 7','Brasil','Biografia exclusiva 7');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 8','Brasil','Biografia exclusiva 8');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 9','Brasil','Biografia exclusiva 9');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 10','Brasil','Biografia exclusiva 10');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 11','Brasil','Biografia exclusiva 11');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 12','Brasil','Biografia exclusiva 12');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 13','Brasil','Biografia exclusiva 13');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 14','Brasil','Biografia exclusiva 14');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 15','Brasil','Biografia exclusiva 15');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 16','Brasil','Biografia exclusiva 16');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 17','Brasil','Biografia exclusiva 17');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 18','Brasil','Biografia exclusiva 18');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 19','Brasil','Biografia exclusiva 19');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 20','Brasil','Biografia exclusiva 20');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 21','Brasil','Biografia exclusiva 21');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 22','Brasil','Biografia exclusiva 22');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 23','Brasil','Biografia exclusiva 23');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 24','Brasil','Biografia exclusiva 24');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 25','Brasil','Biografia exclusiva 25');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 26','Brasil','Biografia exclusiva 26');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 27','Brasil','Biografia exclusiva 27');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 28','Brasil','Biografia exclusiva 28');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 29','Brasil','Biografia exclusiva 29');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 30','Brasil','Biografia exclusiva 30');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 31','Brasil','Biografia exclusiva 31');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 32','Brasil','Biografia exclusiva 32');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 33','Brasil','Biografia exclusiva 33');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 34','Brasil','Biografia exclusiva 34');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 35','Brasil','Biografia exclusiva 35');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 36','Brasil','Biografia exclusiva 36');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 37','Brasil','Biografia exclusiva 37');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 38','Brasil','Biografia exclusiva 38');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 39','Brasil','Biografia exclusiva 39');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 40','Brasil','Biografia exclusiva 40');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 41','Brasil','Biografia exclusiva 41');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 42','Brasil','Biografia exclusiva 42');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 43','Brasil','Biografia exclusiva 43');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 44','Brasil','Biografia exclusiva 44');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 45','Brasil','Biografia exclusiva 45');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 46','Brasil','Biografia exclusiva 46');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 47','Brasil','Biografia exclusiva 47');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 48','Brasil','Biografia exclusiva 48');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 49','Brasil','Biografia exclusiva 49');
+INSERT INTO Artista (nome_artistico,pais,biografia) VALUES ('Artista 50','Brasil','Biografia exclusiva 50');
+
+-- Album
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 1','2024-01-01','Pop',1);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 2','2024-01-02','Pop',2);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 3','2024-01-03','Pop',3);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 4','2024-01-04','Pop',4);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 5','2024-01-05','Pop',5);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 6','2024-01-06','Pop',6);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 7','2024-01-07','Pop',7);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 8','2024-01-08','Pop',8);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 9','2024-01-09','Pop',9);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 10','2024-01-10','Pop',10);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 11','2024-01-11','Pop',11);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 12','2024-01-12','Pop',12);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 13','2024-01-13','Pop',13);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 14','2024-01-14','Pop',14);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 15','2024-01-15','Pop',15);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 16','2024-01-16','Pop',16);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 17','2024-01-17','Pop',17);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 18','2024-01-18','Pop',18);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 19','2024-01-19','Pop',19);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 20','2024-01-20','Pop',20);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 21','2024-01-21','Pop',21);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 22','2024-01-22','Pop',22);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 23','2024-01-23','Pop',23);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 24','2024-01-24','Pop',24);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 25','2024-01-25','Pop',25);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 26','2024-01-26','Pop',26);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 27','2024-01-27','Pop',27);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 28','2024-01-28','Pop',28);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 29','2024-01-01','Pop',29);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 30','2024-01-02','Pop',30);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 31','2024-01-03','Pop',31);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 32','2024-01-04','Pop',32);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 33','2024-01-05','Pop',33);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 34','2024-01-06','Pop',34);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 35','2024-01-07','Pop',35);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 36','2024-01-08','Pop',36);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 37','2024-01-09','Pop',37);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 38','2024-01-10','Pop',38);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 39','2024-01-11','Pop',39);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 40','2024-01-12','Pop',40);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 41','2024-01-13','Pop',41);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 42','2024-01-14','Pop',42);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 43','2024-01-15','Pop',43);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 44','2024-01-16','Pop',44);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 45','2024-01-17','Pop',45);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 46','2024-01-18','Pop',46);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 47','2024-01-19','Pop',47);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 48','2024-01-20','Pop',48);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 49','2024-01-21','Pop',49);
+INSERT INTO Album (titulo,data_lancamento,genero,id_artista) VALUES ('Album 50','2024-01-22','Pop',50);
+
+-- Audio
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 1','03:01','Musica','0',1);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 2','03:02','Musica','0',2);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 3','03:03','Musica','0',3);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 4','03:04','Musica','0',4);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 5','03:05','Musica','0',5);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 6','03:06','Musica','0',6);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 7','03:07','Musica','0',7);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 8','03:08','Musica','0',8);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 9','03:09','Musica','0',9);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 10','03:10','Musica','0',10);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 11','03:11','Musica','0',11);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 12','03:12','Musica','0',12);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 13','03:13','Musica','0',13);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 14','03:14','Musica','0',14);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 15','03:15','Musica','0',15);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 16','03:16','Musica','0',16);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 17','03:17','Musica','0',17);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 18','03:18','Musica','0',18);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 19','03:19','Musica','0',19);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 20','03:20','Musica','0',20);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 21','03:21','Musica','0',21);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 22','03:22','Musica','0',22);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 23','03:23','Musica','0',23);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 24','03:24','Musica','0',24);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 25','03:25','Musica','0',25);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 26','03:26','Musica','0',26);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 27','03:27','Musica','0',27);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 28','03:28','Musica','0',28);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 29','03:29','Musica','0',29);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 30','03:30','Musica','0',30);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 31','03:31','Musica','0',31);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 32','03:32','Musica','0',32);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 33','03:33','Musica','0',33);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 34','03:34','Musica','0',34);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 35','03:35','Musica','0',35);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 36','03:36','Musica','0',36);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 37','03:37','Musica','0',37);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 38','03:38','Musica','0',38);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 39','03:39','Musica','0',39);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 40','03:40','Musica','0',40);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 41','03:41','Musica','0',41);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 42','03:42','Musica','0',42);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 43','03:43','Musica','0',43);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 44','03:44','Musica','0',44);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 45','03:45','Musica','0',45);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 46','03:46','Musica','0',46);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 47','03:47','Musica','0',47);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 48','03:48','Musica','0',48);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 49','03:49','Musica','0',49);
+INSERT INTO Audio (titulo,duracao,tipo,numero_reproducoes,id_album) VALUES ('Audio 50','03:50','Musica','0',50);
+
+-- Utilizador
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 1','user1@mail.com','senha1','Free','2026-01-01');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 2','user2@mail.com','senha2','Free','2026-01-02');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 3','user3@mail.com','senha3','Free','2026-01-03');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 4','user4@mail.com','senha4','Free','2026-01-04');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 5','user5@mail.com','senha5','Free','2026-01-05');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 6','user6@mail.com','senha6','Free','2026-01-06');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 7','user7@mail.com','senha7','Free','2026-01-07');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 8','user8@mail.com','senha8','Free','2026-01-08');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 9','user9@mail.com','senha9','Free','2026-01-09');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 10','user10@mail.com','senha10','Free','2026-01-10');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 11','user11@mail.com','senha11','Free','2026-01-11');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 12','user12@mail.com','senha12','Free','2026-01-12');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 13','user13@mail.com','senha13','Free','2026-01-13');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 14','user14@mail.com','senha14','Free','2026-01-14');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 15','user15@mail.com','senha15','Free','2026-01-15');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 16','user16@mail.com','senha16','Free','2026-01-16');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 17','user17@mail.com','senha17','Free','2026-01-17');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 18','user18@mail.com','senha18','Free','2026-01-18');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 19','user19@mail.com','senha19','Free','2026-01-19');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 20','user20@mail.com','senha20','Free','2026-01-20');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 21','user21@mail.com','senha21','Free','2026-01-21');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 22','user22@mail.com','senha22','Free','2026-01-22');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 23','user23@mail.com','senha23','Free','2026-01-23');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 24','user24@mail.com','senha24','Free','2026-01-24');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 25','user25@mail.com','senha25','Free','2026-01-25');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 26','user26@mail.com','senha26','Free','2026-01-26');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 27','user27@mail.com','senha27','Free','2026-01-27');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 28','user28@mail.com','senha28','Free','2026-01-28');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 29','user29@mail.com','senha29','Free','2026-01-01');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 30','user30@mail.com','senha30','Free','2026-01-02');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 31','user31@mail.com','senha31','Free','2026-01-03');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 32','user32@mail.com','senha32','Free','2026-01-04');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 33','user33@mail.com','senha33','Free','2026-01-05');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 34','user34@mail.com','senha34','Free','2026-01-06');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 35','user35@mail.com','senha35','Free','2026-01-07');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 36','user36@mail.com','senha36','Free','2026-01-08');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 37','user37@mail.com','senha37','Free','2026-01-09');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 38','user38@mail.com','senha38','Free','2026-01-10');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 39','user39@mail.com','senha39','Free','2026-01-11');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 40','user40@mail.com','senha40','Free','2026-01-12');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 41','user41@mail.com','senha41','Free','2026-01-13');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 42','user42@mail.com','senha42','Free','2026-01-14');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 43','user43@mail.com','senha43','Free','2026-01-15');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 44','user44@mail.com','senha44','Free','2026-01-16');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 45','user45@mail.com','senha45','Free','2026-01-17');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 46','user46@mail.com','senha46','Free','2026-01-18');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 47','user47@mail.com','senha47','Free','2026-01-19');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 48','user48@mail.com','senha48','Free','2026-01-20');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 49','user49@mail.com','senha49','Free','2026-01-21');
+INSERT INTO Utilizador (nome,email,senha,tipo,data_registro) VALUES ('Usuario 50','user50@mail.com','senha50','Free','2026-01-22');
+
+-- Royalty
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-01',1,1);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-02',2,2);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-03',3,3);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-04',4,4);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-05',5,5);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-06',6,6);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-07',7,7);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-08',8,8);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-09',9,9);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-10',10,10);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-11',11,11);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-12',12,12);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-13',13,13);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-14',14,14);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-15',15,15);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-16',16,16);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-17',17,17);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-18',18,18);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-19',19,19);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-20',20,20);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-21',21,21);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-22',22,22);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-23',23,23);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-24',24,24);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-25',25,25);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-26',26,26);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-27',27,27);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-28',28,28);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-01',29,29);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-02',30,30);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-03',31,31);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-04',32,32);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-05',33,33);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-06',34,34);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-07',35,35);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-08',36,36);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-09',37,37);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-10',38,38);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-11',39,39);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-12',40,40);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-13',41,41);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-14',42,42);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-15',43,43);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-16',44,44);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-17',45,45);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-18',46,46);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-19',47,47);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-20',48,48);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-21',49,49);
+INSERT INTO Royalty (valor,data_pagamento,id_artista,id_audio) VALUES (5.00,'2026-02-22',50,50);
+
+-- Historico
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-01','00:03:00',1,1);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-02','00:03:00',2,2);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-03','00:03:00',3,3);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-04','00:03:00',4,4);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-05','00:03:00',5,5);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-06','00:03:00',6,6);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-07','00:03:00',7,7);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-08','00:03:00',8,8);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-09','00:03:00',9,9);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-10','00:03:00',10,10);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-11','00:03:00',11,11);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-12','00:03:00',12,12);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-13','00:03:00',13,13);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-14','00:03:00',14,14);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-15','00:03:00',15,15);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-16','00:03:00',16,16);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-17','00:03:00',17,17);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-18','00:03:00',18,18);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-19','00:03:00',19,19);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-20','00:03:00',20,20);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-21','00:03:00',21,21);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-22','00:03:00',22,22);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-23','00:03:00',23,23);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-24','00:03:00',24,24);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-25','00:03:00',25,25);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-26','00:03:00',26,26);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-27','00:03:00',27,27);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-28','00:03:00',28,28);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-01','00:03:00',29,29);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-02','00:03:00',30,30);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-03','00:03:00',31,31);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-04','00:03:00',32,32);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-05','00:03:00',33,33);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-06','00:03:00',34,34);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-07','00:03:00',35,35);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-08','00:03:00',36,36);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-09','00:03:00',37,37);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-10','00:03:00',38,38);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-11','00:03:00',39,39);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-12','00:03:00',40,40);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-13','00:03:00',41,41);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-14','00:03:00',42,42);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-15','00:03:00',43,43);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-16','00:03:00',44,44);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-17','00:03:00',45,45);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-18','00:03:00',46,46);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-19','00:03:00',47,47);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-20','00:03:00',48,48);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-21','00:03:00',49,49);
+INSERT INTO Historico (data_reproducao,tempo_ouvido,id_audio,id_utilizador) VALUES ('2026-03-22','00:03:00',50,50);
+
+-- Playlist
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 1','2026-04-01',1);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 2','2026-04-02',2);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 3','2026-04-03',3);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 4','2026-04-04',4);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 5','2026-04-05',5);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 6','2026-04-06',6);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 7','2026-04-07',7);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 8','2026-04-08',8);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 9','2026-04-09',9);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 10','2026-04-10',10);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 11','2026-04-11',11);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 12','2026-04-12',12);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 13','2026-04-13',13);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 14','2026-04-14',14);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 15','2026-04-15',15);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 16','2026-04-16',16);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 17','2026-04-17',17);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 18','2026-04-18',18);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 19','2026-04-19',19);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 20','2026-04-20',20);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 21','2026-04-21',21);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 22','2026-04-22',22);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 23','2026-04-23',23);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 24','2026-04-24',24);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 25','2026-04-25',25);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 26','2026-04-26',26);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 27','2026-04-27',27);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 28','2026-04-28',28);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 29','2026-04-01',29);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 30','2026-04-02',30);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 31','2026-04-03',31);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 32','2026-04-04',32);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 33','2026-04-05',33);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 34','2026-04-06',34);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 35','2026-04-07',35);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 36','2026-04-08',36);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 37','2026-04-09',37);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 38','2026-04-10',38);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 39','2026-04-11',39);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 40','2026-04-12',40);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 41','2026-04-13',41);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 42','2026-04-14',42);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 43','2026-04-15',43);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 44','2026-04-16',44);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 45','2026-04-17',45);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 46','2026-04-18',46);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 47','2026-04-19',47);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 48','2026-04-20',48);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 49','2026-04-21',49);
+INSERT INTO Playlist (nome,data_criacao,id_utilizador) VALUES ('Playlist 50','2026-04-22',50);
