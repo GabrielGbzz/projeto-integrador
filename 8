@@ -1,0 +1,718 @@
+CREATE DATABASE IronFit;
+USE IronFit;
+
+CREATE TABLE Plano_Subscricao (
+    id_plano INT AUTO_INCREMENT PRIMARY KEY,
+    nome_plano VARCHAR(100),
+    valor_mensal DECIMAL(10,2),
+    duracao INT,
+    beneficios TEXT
+);
+
+CREATE TABLE Membro (
+    id_membro INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100),
+    data_nascimento DATE,
+    email VARCHAR(100) UNIQUE,
+    telefone VARCHAR(20),
+    endereco VARCHAR(150),
+    id_plano INT,
+
+    FOREIGN KEY (id_plano)
+    REFERENCES Plano_Subscricao(id_plano)
+);
+
+CREATE TABLE Avaliacao_Fisica (
+    id_avaliacao INT AUTO_INCREMENT PRIMARY KEY,
+    data_avaliacao DATE,
+    peso DECIMAL(5,2),
+    altura DECIMAL(4,2),
+    imc DECIMAL(5,2),
+    observacoes TEXT,
+    id_membro INT,
+
+    FOREIGN KEY (id_membro)
+    REFERENCES Membro(id_membro)
+);
+
+CREATE TABLE PersonalTrainer (
+    id_trainer INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100),
+    especialidade VARCHAR(100),
+    telefone VARCHAR(20),
+    email VARCHAR(100)
+);
+
+CREATE TABLE Treinamento (
+    id_treinamento INT AUTO_INCREMENT PRIMARY KEY,
+    data_inicio DATE,
+    data_fim DATE,
+    objetivo TEXT,
+    id_membro INT,
+    id_trainer INT,
+
+    FOREIGN KEY (id_membro)
+    REFERENCES Membro(id_membro),
+
+    FOREIGN KEY (id_trainer)
+    REFERENCES PersonalTrainer(id_trainer)
+);
+
+CREATE TABLE Aula_Grupo (
+    id_aula INT AUTO_INCREMENT PRIMARY KEY,
+    nome_aula VARCHAR(100),
+    horario TIME,
+    capacidade INT,
+    nivel VARCHAR(30)
+);
+
+CREATE TABLE Marcacao_Aula (
+    id_marcacao INT AUTO_INCREMENT PRIMARY KEY,
+    data_marcacao DATE,
+    presenca BOOLEAN,
+    id_membro INT,
+    id_aula INT,
+
+    FOREIGN KEY (id_membro)
+    REFERENCES Membro(id_membro),
+
+    FOREIGN KEY (id_aula)
+    REFERENCES Aula_Grupo(id_aula)
+);
+
+ALTER TABLE Plano_Subscricao
+ADD status_ativo BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE Membro
+ADD data_criacao DATE;
+
+ALTER TABLE Avaliacao_Fisica
+ADD usuario_alteracao VARCHAR(50);
+
+ALTER TABLE PersonalTrainer
+ADD status_ativo BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE Treinamento
+ADD observacoes_internas TEXT;
+
+ALTER TABLE Aula_Grupo
+ADD sala VARCHAR(50);
+
+ALTER TABLE Marcacao_Aula
+ADD data_cancelamento DATE;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarPlano(
+IN p_nome VARCHAR(100),
+IN p_valor DECIMAL(10,2),
+IN p_duracao INT,
+IN p_beneficios TEXT
+)
+BEGIN
+
+IF p_valor > 0 THEN
+
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios)
+VALUES(p_nome,p_valor,p_duracao,p_beneficios);
+
+ELSE
+
+SELECT 'Valor inválido' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarMembro(
+IN p_nome VARCHAR(100),
+IN p_data DATE,
+IN p_email VARCHAR(100),
+IN p_tel VARCHAR(20),
+IN p_endereco VARCHAR(150),
+IN p_plano INT
+)
+
+BEGIN
+
+DECLARE existe INT;
+
+SELECT COUNT(*) INTO existe
+FROM Plano_Subscricao
+WHERE id_plano=p_plano;
+
+IF existe>0 THEN
+
+INSERT INTO Membro
+(nome,data_nascimento,email,telefone,endereco,id_plano)
+VALUES
+(p_nome,p_data,p_email,p_tel,p_endereco,p_plano);
+
+ELSE
+
+SELECT 'Plano inexistente' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_Avaliacao(
+IN p_data DATE,
+IN p_peso DECIMAL(5,2),
+IN p_altura DECIMAL(4,2),
+IN p_obs TEXT,
+IN p_membro INT
+)
+
+BEGIN
+
+DECLARE v_imc DECIMAL(5,2);
+
+SET v_imc=p_peso/(p_altura*p_altura);
+
+INSERT INTO Avaliacao_Fisica
+(data_avaliacao,peso,altura,imc,observacoes,id_membro)
+
+VALUES
+(p_data,p_peso,p_altura,v_imc,p_obs,p_membro);
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarTrainer(
+IN p_nome VARCHAR(100),
+IN p_esp VARCHAR(100),
+IN p_tel VARCHAR(20),
+IN p_email VARCHAR(100)
+)
+
+BEGIN
+
+IF EXISTS(SELECT * FROM PersonalTrainer
+WHERE email=p_email)
+
+THEN
+
+SELECT 'Email já existe';
+
+ELSE
+
+INSERT INTO PersonalTrainer
+(nome,especialidade,telefone,email)
+
+VALUES
+(p_nome,p_esp,p_tel,p_email);
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_Treinamento(
+IN p_inicio DATE,
+IN p_fim DATE,
+IN p_obj TEXT,
+IN p_membro INT,
+IN p_trainer INT
+)
+
+BEGIN
+
+IF EXISTS
+(SELECT * FROM PersonalTrainer
+WHERE id_trainer=p_trainer)
+
+THEN
+
+INSERT INTO Treinamento
+(data_inicio,data_fim,objetivo,id_membro,id_trainer)
+
+VALUES
+(p_inicio,p_fim,p_obj,p_membro,p_trainer);
+
+ELSE
+
+SELECT 'Trainer não encontrado';
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_Aula(
+IN p_nome VARCHAR(100),
+IN p_hora TIME,
+IN p_capacidade INT,
+IN p_nivel VARCHAR(30)
+)
+
+BEGIN
+
+IF p_capacidade>0 THEN
+
+INSERT INTO Aula_Grupo
+(nome_aula,horario,capacidade,nivel)
+
+VALUES
+(p_nome,p_hora,p_capacidade,p_nivel);
+
+ELSE
+
+SELECT 'Capacidade inválida';
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_Marcacao(
+IN p_data DATE,
+IN p_presenca BOOLEAN,
+IN p_membro INT,
+IN p_aula INT
+)
+
+BEGIN
+
+IF EXISTS(SELECT * FROM Membro WHERE id_membro=p_membro)
+AND EXISTS(SELECT * FROM Aula_Grupo WHERE id_aula=p_aula)
+
+THEN
+
+INSERT INTO Marcacao_Aula
+(data_marcacao,presenca,id_membro,id_aula)
+
+VALUES
+(p_data,p_presenca,p_membro,p_aula);
+
+ELSE
+
+SELECT 'Membro ou Aula inexistente';
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_calcular_imc
+BEFORE INSERT ON Avaliacao_Fisica
+FOR EACH ROW
+BEGIN
+
+SET NEW.imc = NEW.peso / (NEW.altura * NEW.altura);
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_presenca_padrao
+BEFORE INSERT ON Marcacao_Aula
+FOR EACH ROW
+BEGIN
+
+SET NEW.presenca = FALSE;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_verificar_plano
+BEFORE INSERT ON Treinamento
+FOR EACH ROW
+BEGIN
+
+DECLARE v_plano INT;
+
+SELECT id_plano
+INTO v_plano
+FROM Membro
+WHERE id_membro = NEW.id_membro;
+
+IF v_plano IS NULL THEN
+
+SIGNAL SQLSTATE '45000'
+SET MESSAGE_TEXT = 'O membro não possui plano de subscrição.';
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 1',50.00,12,'Benefícios 1',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 2',51.00,12,'Benefícios 2',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 3',52.00,12,'Benefícios 3',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 4',53.00,12,'Benefícios 4',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 5',54.00,12,'Benefícios 5',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 6',55.00,12,'Benefícios 6',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 7',56.00,12,'Benefícios 7',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 8',57.00,12,'Benefícios 8',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 9',58.00,12,'Benefícios 9',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 10',59.00,12,'Benefícios 10',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 11',60.00,12,'Benefícios 11',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 12',61.00,12,'Benefícios 12',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 13',62.00,12,'Benefícios 13',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 14',63.00,12,'Benefícios 14',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 15',64.00,12,'Benefícios 15',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 16',65.00,12,'Benefícios 16',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 17',66.00,12,'Benefícios 17',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 18',67.00,12,'Benefícios 18',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 19',68.00,12,'Benefícios 19',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 20',69.00,12,'Benefícios 20',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 21',70.00,12,'Benefícios 21',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 22',71.00,12,'Benefícios 22',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 23',72.00,12,'Benefícios 23',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 24',73.00,12,'Benefícios 24',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 25',74.00,12,'Benefícios 25',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 26',75.00,12,'Benefícios 26',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 27',76.00,12,'Benefícios 27',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 28',77.00,12,'Benefícios 28',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 29',78.00,12,'Benefícios 29',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 30',79.00,12,'Benefícios 30',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 31',80.00,12,'Benefícios 31',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 32',81.00,12,'Benefícios 32',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 33',82.00,12,'Benefícios 33',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 34',83.00,12,'Benefícios 34',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 35',84.00,12,'Benefícios 35',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 36',85.00,12,'Benefícios 36',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 37',86.00,12,'Benefícios 37',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 38',87.00,12,'Benefícios 38',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 39',88.00,12,'Benefícios 39',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 40',89.00,12,'Benefícios 40',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 41',90.00,12,'Benefícios 41',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 42',91.00,12,'Benefícios 42',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 43',92.00,12,'Benefícios 43',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 44',93.00,12,'Benefícios 44',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 45',94.00,12,'Benefícios 45',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 46',95.00,12,'Benefícios 46',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 47',96.00,12,'Benefícios 47',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 48',97.00,12,'Benefícios 48',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 49',98.00,12,'Benefícios 49',TRUE);
+INSERT INTO Plano_Subscricao(nome_plano,valor_mensal,duracao,beneficios,status_ativo) VALUES('Plano 50',99.00,12,'Benefícios 50',TRUE);
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 1','1998-01-01','membro1@fit.com','31980000001','Rua 1',1,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 2','1998-01-02','membro2@fit.com','31980000002','Rua 2',2,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 3','1998-01-03','membro3@fit.com','31980000003','Rua 3',3,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 4','1998-01-04','membro4@fit.com','31980000004','Rua 4',4,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 5','1998-01-05','membro5@fit.com','31980000005','Rua 5',5,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 6','1998-01-06','membro6@fit.com','31980000006','Rua 6',6,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 7','1998-01-07','membro7@fit.com','31980000007','Rua 7',7,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 8','1998-01-08','membro8@fit.com','31980000008','Rua 8',8,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 9','1998-01-09','membro9@fit.com','31980000009','Rua 9',9,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 10','1998-01-10','membro10@fit.com','31980000010','Rua 10',10,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 11','1998-01-11','membro11@fit.com','31980000011','Rua 11',11,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 12','1998-01-12','membro12@fit.com','31980000012','Rua 12',12,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 13','1998-01-13','membro13@fit.com','31980000013','Rua 13',13,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 14','1998-01-14','membro14@fit.com','31980000014','Rua 14',14,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 15','1998-01-15','membro15@fit.com','31980000015','Rua 15',15,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 16','1998-01-16','membro16@fit.com','31980000016','Rua 16',16,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 17','1998-01-17','membro17@fit.com','31980000017','Rua 17',17,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 18','1998-01-18','membro18@fit.com','31980000018','Rua 18',18,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 19','1998-01-19','membro19@fit.com','31980000019','Rua 19',19,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 20','1998-01-20','membro20@fit.com','31980000020','Rua 20',20,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 21','1998-01-21','membro21@fit.com','31980000021','Rua 21',21,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 22','1998-01-22','membro22@fit.com','31980000022','Rua 22',22,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 23','1998-01-23','membro23@fit.com','31980000023','Rua 23',23,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 24','1998-01-24','membro24@fit.com','31980000024','Rua 24',24,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 25','1998-01-25','membro25@fit.com','31980000025','Rua 25',25,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 26','1998-01-26','membro26@fit.com','31980000026','Rua 26',26,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 27','1998-01-27','membro27@fit.com','31980000027','Rua 27',27,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 28','1998-01-28','membro28@fit.com','31980000028','Rua 28',28,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 29','1998-01-01','membro29@fit.com','31980000029','Rua 29',29,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 30','1998-01-02','membro30@fit.com','31980000030','Rua 30',30,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 31','1998-01-03','membro31@fit.com','31980000031','Rua 31',31,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 32','1998-01-04','membro32@fit.com','31980000032','Rua 32',32,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 33','1998-01-05','membro33@fit.com','31980000033','Rua 33',33,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 34','1998-01-06','membro34@fit.com','31980000034','Rua 34',34,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 35','1998-01-07','membro35@fit.com','31980000035','Rua 35',35,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 36','1998-01-08','membro36@fit.com','31980000036','Rua 36',36,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 37','1998-01-09','membro37@fit.com','31980000037','Rua 37',37,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 38','1998-01-10','membro38@fit.com','31980000038','Rua 38',38,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 39','1998-01-11','membro39@fit.com','31980000039','Rua 39',39,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 40','1998-01-12','membro40@fit.com','31980000040','Rua 40',40,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 41','1998-01-13','membro41@fit.com','31980000041','Rua 41',41,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 42','1998-01-14','membro42@fit.com','31980000042','Rua 42',42,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 43','1998-01-15','membro43@fit.com','31980000043','Rua 43',43,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 44','1998-01-16','membro44@fit.com','31980000044','Rua 44',44,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 45','1998-01-17','membro45@fit.com','31980000045','Rua 45',45,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 46','1998-01-18','membro46@fit.com','31980000046','Rua 46',46,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 47','1998-01-19','membro47@fit.com','31980000047','Rua 47',47,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 48','1998-01-20','membro48@fit.com','31980000048','Rua 48',48,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 49','1998-01-21','membro49@fit.com','31980000049','Rua 49',49,'2026-01-01');
+INSERT INTO Membro(nome,data_nascimento,email,telefone,endereco,id_plano,data_criacao) VALUES('Membro 50','1998-01-22','membro50@fit.com','31980000050','Rua 50',50,'2026-01-01');
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 1','Musculação','31770000001','trainer1@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 2','Musculação','31770000002','trainer2@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 3','Musculação','31770000003','trainer3@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 4','Musculação','31770000004','trainer4@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 5','Musculação','31770000005','trainer5@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 6','Musculação','31770000006','trainer6@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 7','Musculação','31770000007','trainer7@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 8','Musculação','31770000008','trainer8@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 9','Musculação','31770000009','trainer9@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 10','Musculação','31770000010','trainer10@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 11','Musculação','31770000011','trainer11@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 12','Musculação','31770000012','trainer12@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 13','Musculação','31770000013','trainer13@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 14','Musculação','31770000014','trainer14@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 15','Musculação','31770000015','trainer15@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 16','Musculação','31770000016','trainer16@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 17','Musculação','31770000017','trainer17@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 18','Musculação','31770000018','trainer18@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 19','Musculação','31770000019','trainer19@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 20','Musculação','31770000020','trainer20@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 21','Musculação','31770000021','trainer21@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 22','Musculação','31770000022','trainer22@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 23','Musculação','31770000023','trainer23@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 24','Musculação','31770000024','trainer24@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 25','Musculação','31770000025','trainer25@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 26','Musculação','31770000026','trainer26@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 27','Musculação','31770000027','trainer27@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 28','Musculação','31770000028','trainer28@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 29','Musculação','31770000029','trainer29@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 30','Musculação','31770000030','trainer30@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 31','Musculação','31770000031','trainer31@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 32','Musculação','31770000032','trainer32@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 33','Musculação','31770000033','trainer33@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 34','Musculação','31770000034','trainer34@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 35','Musculação','31770000035','trainer35@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 36','Musculação','31770000036','trainer36@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 37','Musculação','31770000037','trainer37@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 38','Musculação','31770000038','trainer38@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 39','Musculação','31770000039','trainer39@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 40','Musculação','31770000040','trainer40@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 41','Musculação','31770000041','trainer41@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 42','Musculação','31770000042','trainer42@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 43','Musculação','31770000043','trainer43@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 44','Musculação','31770000044','trainer44@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 45','Musculação','31770000045','trainer45@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 46','Musculação','31770000046','trainer46@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 47','Musculação','31770000047','trainer47@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 48','Musculação','31770000048','trainer48@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 49','Musculação','31770000049','trainer49@fit.com',TRUE);
+INSERT INTO PersonalTrainer(nome,especialidade,telefone,email,status_ativo) VALUES('Trainer 50','Musculação','31770000050','trainer50@fit.com',TRUE);
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',61,1.75,NULL,'Avaliação 1',1,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',62,1.75,NULL,'Avaliação 2',2,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',63,1.75,NULL,'Avaliação 3',3,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',64,1.75,NULL,'Avaliação 4',4,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',65,1.75,NULL,'Avaliação 5',5,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',66,1.75,NULL,'Avaliação 6',6,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',67,1.75,NULL,'Avaliação 7',7,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',68,1.75,NULL,'Avaliação 8',8,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',69,1.75,NULL,'Avaliação 9',9,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',70,1.75,NULL,'Avaliação 10',10,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',71,1.75,NULL,'Avaliação 11',11,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',72,1.75,NULL,'Avaliação 12',12,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',73,1.75,NULL,'Avaliação 13',13,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',74,1.75,NULL,'Avaliação 14',14,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',75,1.75,NULL,'Avaliação 15',15,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',76,1.75,NULL,'Avaliação 16',16,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',77,1.75,NULL,'Avaliação 17',17,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',78,1.75,NULL,'Avaliação 18',18,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',79,1.75,NULL,'Avaliação 19',19,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',80,1.75,NULL,'Avaliação 20',20,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',81,1.75,NULL,'Avaliação 21',21,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',82,1.75,NULL,'Avaliação 22',22,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',83,1.75,NULL,'Avaliação 23',23,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',84,1.75,NULL,'Avaliação 24',24,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',85,1.75,NULL,'Avaliação 25',25,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',86,1.75,NULL,'Avaliação 26',26,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',87,1.75,NULL,'Avaliação 27',27,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',88,1.75,NULL,'Avaliação 28',28,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',89,1.75,NULL,'Avaliação 29',29,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',90,1.75,NULL,'Avaliação 30',30,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',91,1.75,NULL,'Avaliação 31',31,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',92,1.75,NULL,'Avaliação 32',32,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',93,1.75,NULL,'Avaliação 33',33,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',94,1.75,NULL,'Avaliação 34',34,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',95,1.75,NULL,'Avaliação 35',35,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',96,1.75,NULL,'Avaliação 36',36,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',97,1.75,NULL,'Avaliação 37',37,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',98,1.75,NULL,'Avaliação 38',38,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',99,1.75,NULL,'Avaliação 39',39,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',100,1.75,NULL,'Avaliação 40',40,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',101,1.75,NULL,'Avaliação 41',41,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',102,1.75,NULL,'Avaliação 42',42,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',103,1.75,NULL,'Avaliação 43',43,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',104,1.75,NULL,'Avaliação 44',44,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',105,1.75,NULL,'Avaliação 45',45,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',106,1.75,NULL,'Avaliação 46',46,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',107,1.75,NULL,'Avaliação 47',47,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',108,1.75,NULL,'Avaliação 48',48,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',109,1.75,NULL,'Avaliação 49',49,'admin');
+INSERT INTO Avaliacao_Fisica(data_avaliacao,peso,altura,imc,observacoes,id_membro,usuario_alteracao) VALUES('2026-07-01',110,1.75,NULL,'Avaliação 50',50,'admin');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',1,1,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',2,2,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',3,3,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',4,4,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',5,5,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',6,6,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',7,7,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',8,8,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',9,9,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',10,10,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',11,11,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',12,12,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',13,13,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',14,14,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',15,15,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',16,16,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',17,17,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',18,18,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',19,19,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',20,20,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',21,21,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',22,22,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',23,23,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',24,24,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',25,25,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',26,26,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',27,27,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',28,28,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',29,29,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',30,30,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',31,31,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',32,32,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',33,33,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',34,34,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',35,35,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',36,36,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',37,37,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',38,38,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',39,39,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',40,40,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',41,41,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',42,42,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',43,43,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',44,44,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',45,45,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',46,46,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',47,47,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',48,48,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',49,49,'Nenhuma');
+INSERT INTO Treinamento(data_inicio,data_fim,objetivo,id_membro,id_trainer,observacoes_internas) VALUES('2026-07-01','2026-12-31','Hipertrofia',50,50,'Nenhuma');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 1','18:00:00',20,'Intermediário','Sala 2');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 2','18:00:00',20,'Intermediário','Sala 3');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 3','18:00:00',20,'Intermediário','Sala 4');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 4','18:00:00',20,'Intermediário','Sala 5');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 5','18:00:00',20,'Intermediário','Sala 1');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 6','18:00:00',20,'Intermediário','Sala 2');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 7','18:00:00',20,'Intermediário','Sala 3');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 8','18:00:00',20,'Intermediário','Sala 4');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 9','18:00:00',20,'Intermediário','Sala 5');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 10','18:00:00',20,'Intermediário','Sala 1');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 11','18:00:00',20,'Intermediário','Sala 2');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 12','18:00:00',20,'Intermediário','Sala 3');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 13','18:00:00',20,'Intermediário','Sala 4');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 14','18:00:00',20,'Intermediário','Sala 5');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 15','18:00:00',20,'Intermediário','Sala 1');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 16','18:00:00',20,'Intermediário','Sala 2');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 17','18:00:00',20,'Intermediário','Sala 3');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 18','18:00:00',20,'Intermediário','Sala 4');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 19','18:00:00',20,'Intermediário','Sala 5');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 20','18:00:00',20,'Intermediário','Sala 1');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 21','18:00:00',20,'Intermediário','Sala 2');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 22','18:00:00',20,'Intermediário','Sala 3');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 23','18:00:00',20,'Intermediário','Sala 4');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 24','18:00:00',20,'Intermediário','Sala 5');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 25','18:00:00',20,'Intermediário','Sala 1');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 26','18:00:00',20,'Intermediário','Sala 2');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 27','18:00:00',20,'Intermediário','Sala 3');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 28','18:00:00',20,'Intermediário','Sala 4');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 29','18:00:00',20,'Intermediário','Sala 5');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 30','18:00:00',20,'Intermediário','Sala 1');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 31','18:00:00',20,'Intermediário','Sala 2');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 32','18:00:00',20,'Intermediário','Sala 3');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 33','18:00:00',20,'Intermediário','Sala 4');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 34','18:00:00',20,'Intermediário','Sala 5');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 35','18:00:00',20,'Intermediário','Sala 1');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 36','18:00:00',20,'Intermediário','Sala 2');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 37','18:00:00',20,'Intermediário','Sala 3');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 38','18:00:00',20,'Intermediário','Sala 4');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 39','18:00:00',20,'Intermediário','Sala 5');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 40','18:00:00',20,'Intermediário','Sala 1');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 41','18:00:00',20,'Intermediário','Sala 2');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 42','18:00:00',20,'Intermediário','Sala 3');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 43','18:00:00',20,'Intermediário','Sala 4');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 44','18:00:00',20,'Intermediário','Sala 5');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 45','18:00:00',20,'Intermediário','Sala 1');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 46','18:00:00',20,'Intermediário','Sala 2');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 47','18:00:00',20,'Intermediário','Sala 3');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 48','18:00:00',20,'Intermediário','Sala 4');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 49','18:00:00',20,'Intermediário','Sala 5');
+INSERT INTO Aula_Grupo(nome_aula,horario,capacidade,nivel,sala) VALUES('Aula 50','18:00:00',20,'Intermediário','Sala 1');
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,1,1,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,2,2,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,3,3,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,4,4,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,5,5,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,6,6,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,7,7,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,8,8,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,9,9,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,10,10,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,11,11,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,12,12,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,13,13,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,14,14,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,15,15,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,16,16,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,17,17,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,18,18,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,19,19,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,20,20,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,21,21,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,22,22,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,23,23,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,24,24,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,25,25,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,26,26,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,27,27,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,28,28,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,29,29,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,30,30,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,31,31,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,32,32,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,33,33,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,34,34,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,35,35,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,36,36,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,37,37,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,38,38,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,39,39,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,40,40,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,41,41,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,42,42,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,43,43,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,44,44,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,45,45,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,46,46,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,47,47,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,48,48,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,49,49,NULL);
+INSERT INTO Marcacao_Aula(data_marcacao,presenca,id_membro,id_aula,data_cancelamento) VALUES('2026-07-02',FALSE,50,50,NULL);
