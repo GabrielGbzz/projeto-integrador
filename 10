@@ -1,0 +1,724 @@
+CREATE DATABASE LogisTruck;
+USE LogisTruck;
+
+CREATE TABLE Caminhao(
+id_caminhao INT AUTO_INCREMENT PRIMARY KEY,
+placa VARCHAR(10),
+modelo VARCHAR(50),
+ano INT,
+capacidade_carga DECIMAL(10,2),
+status VARCHAR(30)
+);
+
+CREATE TABLE Motorista(
+id_motorista INT AUTO_INCREMENT PRIMARY KEY,
+nome VARCHAR(100),
+cpf VARCHAR(14),
+telefone VARCHAR(20),
+cnh VARCHAR(20)
+);
+
+CREATE TABLE Cliente_B2B(
+id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+razao_social VARCHAR(100),
+cnpj VARCHAR(18),
+telefone VARCHAR(20),
+endereco VARCHAR(150),
+email VARCHAR(100)
+);
+
+CREATE TABLE Rota_Entrega(
+id_rota INT AUTO_INCREMENT PRIMARY KEY,
+origem VARCHAR(100),
+destino VARCHAR(100),
+distancia_km DECIMAL(10,2),
+data_entrega DATE,
+id_caminhao INT,
+id_motorista INT,
+id_cliente INT,
+
+FOREIGN KEY(id_caminhao)
+REFERENCES Caminhao(id_caminhao),
+
+FOREIGN KEY(id_motorista)
+REFERENCES Motorista(id_motorista),
+
+FOREIGN KEY(id_cliente)
+REFERENCES Cliente_B2B(id_cliente)
+);
+
+CREATE TABLE Carga(
+id_carga INT AUTO_INCREMENT PRIMARY KEY,
+descricao VARCHAR(100),
+peso DECIMAL(10,2),
+tipo_carga VARCHAR(50),
+id_rota INT,
+
+FOREIGN KEY(id_rota)
+REFERENCES Rota_Entrega(id_rota)
+);
+
+CREATE TABLE Manutencao(
+id_manutencao INT AUTO_INCREMENT PRIMARY KEY,
+data_manutencao DATE,
+tipo VARCHAR(50),
+custo DECIMAL(10,2),
+descricao TEXT,
+id_caminhao INT,
+
+FOREIGN KEY(id_caminhao)
+REFERENCES Caminhao(id_caminhao)
+);
+
+CREATE TABLE Consumo_Combustivel(
+id_consumo INT AUTO_INCREMENT PRIMARY KEY,
+data_abastecimento DATE,
+litros DECIMAL(10,2),
+valor DECIMAL(10,2),
+km_atual INT,
+id_caminhao INT,
+
+FOREIGN KEY(id_caminhao)
+REFERENCES Caminhao(id_caminhao)
+);
+
+ALTER TABLE Caminhao
+ADD data_cadastro DATE;
+
+ALTER TABLE Motorista
+ADD status_ativo BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE Cliente_B2B
+ADD observacoes TEXT;
+
+ALTER TABLE Rota_Entrega
+ADD usuario_alteracao VARCHAR(50);
+
+ALTER TABLE Carga
+ADD data_cadastro DATE;
+
+ALTER TABLE Manutencao
+ADD status_servico VARCHAR(30);
+
+ALTER TABLE Consumo_Combustivel
+ADD observacao TEXT;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarCaminhao(
+IN p_placa VARCHAR(10),
+IN p_modelo VARCHAR(50),
+IN p_ano INT,
+IN p_capacidade DECIMAL(10,2),
+IN p_status VARCHAR(30)
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Caminhao WHERE placa=p_placa) THEN
+
+SELECT 'Placa já cadastrada.' AS Mensagem;
+
+ELSE
+
+INSERT INTO Caminhao
+(placa,modelo,ano,capacidade_carga,status)
+VALUES
+(p_placa,p_modelo,p_ano,p_capacidade,p_status);
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarMotorista(
+IN p_nome VARCHAR(100),
+IN p_cpf VARCHAR(14),
+IN p_telefone VARCHAR(20),
+IN p_cnh VARCHAR(20)
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Motorista WHERE cpf=p_cpf) THEN
+
+SELECT 'CPF já cadastrado.' AS Mensagem;
+
+ELSE
+
+INSERT INTO Motorista
+(nome,cpf,telefone,cnh)
+
+VALUES
+(p_nome,p_cpf,p_telefone,p_cnh);
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarCliente(
+IN p_razao VARCHAR(100),
+IN p_cnpj VARCHAR(18),
+IN p_tel VARCHAR(20),
+IN p_endereco VARCHAR(150),
+IN p_email VARCHAR(100)
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Cliente_B2B WHERE cnpj=p_cnpj) THEN
+
+SELECT 'CNPJ já cadastrado.' AS Mensagem;
+
+ELSE
+
+INSERT INTO Cliente_B2B
+(razao_social,cnpj,telefone,endereco,email)
+
+VALUES
+(p_razao,p_cnpj,p_tel,p_endereco,p_email);
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarRota(
+IN p_origem VARCHAR(100),
+IN p_destino VARCHAR(100),
+IN p_distancia DECIMAL(10,2),
+IN p_data DATE,
+IN p_caminhao INT,
+IN p_motorista INT,
+IN p_cliente INT
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Caminhao WHERE id_caminhao=p_caminhao)
+AND EXISTS(SELECT * FROM Motorista WHERE id_motorista=p_motorista)
+AND EXISTS(SELECT * FROM Cliente_B2B WHERE id_cliente=p_cliente)
+
+THEN
+
+INSERT INTO Rota_Entrega
+(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente)
+
+VALUES
+(p_origem,p_destino,p_distancia,p_data,p_caminhao,p_motorista,p_cliente);
+
+ELSE
+
+SELECT 'Dados inválidos.' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarCarga(
+IN p_descricao VARCHAR(100),
+IN p_peso DECIMAL(10,2),
+IN p_tipo VARCHAR(50),
+IN p_rota INT
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Rota_Entrega WHERE id_rota=p_rota) THEN
+
+INSERT INTO Carga
+(descricao,peso,tipo_carga,id_rota)
+
+VALUES
+(p_descricao,p_peso,p_tipo,p_rota);
+
+ELSE
+
+SELECT 'Rota não encontrada.' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_RegistrarManutencao(
+IN p_data DATE,
+IN p_tipo VARCHAR(50),
+IN p_custo DECIMAL(10,2),
+IN p_descricao TEXT,
+IN p_caminhao INT
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Caminhao WHERE id_caminhao=p_caminhao) THEN
+
+INSERT INTO Manutencao
+(data_manutencao,tipo,custo,descricao,id_caminhao)
+
+VALUES
+(p_data,p_tipo,p_custo,p_descricao,p_caminhao);
+
+ELSE
+
+SELECT 'Caminhão não encontrado.' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_RegistrarAbastecimento(
+IN p_data DATE,
+IN p_litros DECIMAL(10,2),
+IN p_valor DECIMAL(10,2),
+IN p_km INT,
+IN p_caminhao INT
+)
+BEGIN
+
+DECLARE media DECIMAL(10,2);
+
+IF EXISTS(SELECT * FROM Caminhao WHERE id_caminhao=p_caminhao) THEN
+
+SET media = p_km / p_litros;
+
+INSERT INTO Consumo_Combustivel
+(data_abastecimento,litros,valor,km_atual,id_caminhao)
+
+VALUES
+(p_data,p_litros,p_valor,p_km,p_caminhao);
+
+SELECT media AS km_por_litro;
+
+ELSE
+
+SELECT 'Caminhão não encontrado.' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_caminhao_em_rota
+AFTER INSERT ON Rota_Entrega
+FOR EACH ROW
+BEGIN
+
+UPDATE Caminhao
+SET status = 'Em Rota'
+WHERE id_caminhao = NEW.id_caminhao;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_verificar_capacidade
+BEFORE INSERT ON Carga
+FOR EACH ROW
+BEGIN
+
+DECLARE capacidade DECIMAL(10,2);
+
+SELECT c.capacidade_carga
+INTO capacidade
+FROM Caminhao c
+JOIN Rota_Entrega r
+ON c.id_caminhao = r.id_caminhao
+WHERE r.id_rota = NEW.id_rota;
+
+IF NEW.peso > capacidade THEN
+
+SIGNAL SQLSTATE '45000'
+SET MESSAGE_TEXT = 'Peso da carga excede a capacidade do caminhão.';
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_status_manutencao
+AFTER INSERT ON Manutencao
+FOR EACH ROW
+BEGIN
+
+UPDATE Caminhao
+SET status = 'Em Manutenção'
+WHERE id_caminhao = NEW.id_caminhao;
+
+END $$
+
+DELIMITER ;
+
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0001','Modelo 1',2022,10100.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0002','Modelo 2',2022,10200.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0003','Modelo 3',2022,10300.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0004','Modelo 4',2022,10400.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0005','Modelo 5',2022,10500.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0006','Modelo 6',2022,10600.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0007','Modelo 7',2022,10700.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0008','Modelo 8',2022,10800.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0009','Modelo 9',2022,10900.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0010','Modelo 10',2022,11000.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0011','Modelo 11',2022,11100.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0012','Modelo 12',2022,11200.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0013','Modelo 13',2022,11300.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0014','Modelo 14',2022,11400.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0015','Modelo 15',2022,11500.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0016','Modelo 16',2022,11600.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0017','Modelo 17',2022,11700.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0018','Modelo 18',2022,11800.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0019','Modelo 19',2022,11900.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0020','Modelo 20',2022,12000.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0021','Modelo 21',2022,12100.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0022','Modelo 22',2022,12200.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0023','Modelo 23',2022,12300.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0024','Modelo 24',2022,12400.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0025','Modelo 25',2022,12500.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0026','Modelo 26',2022,12600.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0027','Modelo 27',2022,12700.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0028','Modelo 28',2022,12800.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0029','Modelo 29',2022,12900.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0030','Modelo 30',2022,13000.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0031','Modelo 31',2022,13100.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0032','Modelo 32',2022,13200.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0033','Modelo 33',2022,13300.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0034','Modelo 34',2022,13400.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0035','Modelo 35',2022,13500.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0036','Modelo 36',2022,13600.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0037','Modelo 37',2022,13700.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0038','Modelo 38',2022,13800.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0039','Modelo 39',2022,13900.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0040','Modelo 40',2022,14000.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0041','Modelo 41',2022,14100.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0042','Modelo 42',2022,14200.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0043','Modelo 43',2022,14300.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0044','Modelo 44',2022,14400.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0045','Modelo 45',2022,14500.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0046','Modelo 46',2022,14600.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0047','Modelo 47',2022,14700.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0048','Modelo 48',2022,14800.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0049','Modelo 49',2022,14900.00,'Disponível','2026-01-01');
+INSERT INTO Caminhao(placa,modelo,ano,capacidade_carga,status,data_cadastro) VALUES('ABC0050','Modelo 50',2022,15000.00,'Disponível','2026-01-01');
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 1','00000000001','31990000001','CNH00001',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 2','00000000002','31990000002','CNH00002',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 3','00000000003','31990000003','CNH00003',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 4','00000000004','31990000004','CNH00004',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 5','00000000005','31990000005','CNH00005',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 6','00000000006','31990000006','CNH00006',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 7','00000000007','31990000007','CNH00007',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 8','00000000008','31990000008','CNH00008',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 9','00000000009','31990000009','CNH00009',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 10','00000000010','31990000010','CNH00010',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 11','00000000011','31990000011','CNH00011',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 12','00000000012','31990000012','CNH00012',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 13','00000000013','31990000013','CNH00013',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 14','00000000014','31990000014','CNH00014',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 15','00000000015','31990000015','CNH00015',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 16','00000000016','31990000016','CNH00016',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 17','00000000017','31990000017','CNH00017',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 18','00000000018','31990000018','CNH00018',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 19','00000000019','31990000019','CNH00019',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 20','00000000020','31990000020','CNH00020',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 21','00000000021','31990000021','CNH00021',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 22','00000000022','31990000022','CNH00022',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 23','00000000023','31990000023','CNH00023',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 24','00000000024','31990000024','CNH00024',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 25','00000000025','31990000025','CNH00025',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 26','00000000026','31990000026','CNH00026',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 27','00000000027','31990000027','CNH00027',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 28','00000000028','31990000028','CNH00028',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 29','00000000029','31990000029','CNH00029',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 30','00000000030','31990000030','CNH00030',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 31','00000000031','31990000031','CNH00031',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 32','00000000032','31990000032','CNH00032',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 33','00000000033','31990000033','CNH00033',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 34','00000000034','31990000034','CNH00034',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 35','00000000035','31990000035','CNH00035',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 36','00000000036','31990000036','CNH00036',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 37','00000000037','31990000037','CNH00037',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 38','00000000038','31990000038','CNH00038',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 39','00000000039','31990000039','CNH00039',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 40','00000000040','31990000040','CNH00040',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 41','00000000041','31990000041','CNH00041',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 42','00000000042','31990000042','CNH00042',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 43','00000000043','31990000043','CNH00043',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 44','00000000044','31990000044','CNH00044',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 45','00000000045','31990000045','CNH00045',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 46','00000000046','31990000046','CNH00046',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 47','00000000047','31990000047','CNH00047',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 48','00000000048','31990000048','CNH00048',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 49','00000000049','31990000049','CNH00049',TRUE);
+INSERT INTO Motorista(nome,cpf,telefone,cnh,status_ativo) VALUES('Motorista 50','00000000050','31990000050','CNH00050',TRUE);
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 1','00.000.000/0001-01','31330000001','Endereço 1','empresa1@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 2','00.000.000/0002-02','31330000002','Endereço 2','empresa2@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 3','00.000.000/0003-03','31330000003','Endereço 3','empresa3@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 4','00.000.000/0004-04','31330000004','Endereço 4','empresa4@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 5','00.000.000/0005-05','31330000005','Endereço 5','empresa5@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 6','00.000.000/0006-06','31330000006','Endereço 6','empresa6@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 7','00.000.000/0007-07','31330000007','Endereço 7','empresa7@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 8','00.000.000/0008-08','31330000008','Endereço 8','empresa8@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 9','00.000.000/0009-09','31330000009','Endereço 9','empresa9@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 10','00.000.000/0000-10','31330000010','Endereço 10','empresa10@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 11','00.000.000/0001-11','31330000011','Endereço 11','empresa11@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 12','00.000.000/0002-12','31330000012','Endereço 12','empresa12@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 13','00.000.000/0003-13','31330000013','Endereço 13','empresa13@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 14','00.000.000/0004-14','31330000014','Endereço 14','empresa14@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 15','00.000.000/0005-15','31330000015','Endereço 15','empresa15@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 16','00.000.000/0006-16','31330000016','Endereço 16','empresa16@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 17','00.000.000/0007-17','31330000017','Endereço 17','empresa17@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 18','00.000.000/0008-18','31330000018','Endereço 18','empresa18@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 19','00.000.000/0009-19','31330000019','Endereço 19','empresa19@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 20','00.000.000/0000-20','31330000020','Endereço 20','empresa20@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 21','00.000.000/0001-21','31330000021','Endereço 21','empresa21@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 22','00.000.000/0002-22','31330000022','Endereço 22','empresa22@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 23','00.000.000/0003-23','31330000023','Endereço 23','empresa23@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 24','00.000.000/0004-24','31330000024','Endereço 24','empresa24@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 25','00.000.000/0005-25','31330000025','Endereço 25','empresa25@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 26','00.000.000/0006-26','31330000026','Endereço 26','empresa26@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 27','00.000.000/0007-27','31330000027','Endereço 27','empresa27@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 28','00.000.000/0008-28','31330000028','Endereço 28','empresa28@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 29','00.000.000/0009-29','31330000029','Endereço 29','empresa29@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 30','00.000.000/0000-30','31330000030','Endereço 30','empresa30@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 31','00.000.000/0001-31','31330000031','Endereço 31','empresa31@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 32','00.000.000/0002-32','31330000032','Endereço 32','empresa32@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 33','00.000.000/0003-33','31330000033','Endereço 33','empresa33@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 34','00.000.000/0004-34','31330000034','Endereço 34','empresa34@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 35','00.000.000/0005-35','31330000035','Endereço 35','empresa35@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 36','00.000.000/0006-36','31330000036','Endereço 36','empresa36@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 37','00.000.000/0007-37','31330000037','Endereço 37','empresa37@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 38','00.000.000/0008-38','31330000038','Endereço 38','empresa38@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 39','00.000.000/0009-39','31330000039','Endereço 39','empresa39@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 40','00.000.000/0000-40','31330000040','Endereço 40','empresa40@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 41','00.000.000/0001-41','31330000041','Endereço 41','empresa41@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 42','00.000.000/0002-42','31330000042','Endereço 42','empresa42@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 43','00.000.000/0003-43','31330000043','Endereço 43','empresa43@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 44','00.000.000/0004-44','31330000044','Endereço 44','empresa44@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 45','00.000.000/0005-45','31330000045','Endereço 45','empresa45@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 46','00.000.000/0006-46','31330000046','Endereço 46','empresa46@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 47','00.000.000/0007-47','31330000047','Endereço 47','empresa47@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 48','00.000.000/0008-48','31330000048','Endereço 48','empresa48@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 49','00.000.000/0009-49','31330000049','Endereço 49','empresa49@mail.com','');
+INSERT INTO Cliente_B2B(razao_social,cnpj,telefone,endereco,email,observacoes) VALUES('Empresa 50','00.000.000/0000-50','31330000050','Endereço 50','empresa50@mail.com','');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 1','Destino 1',101.00,'2026-07-20',1,1,1,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 2','Destino 2',102.00,'2026-07-20',2,2,2,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 3','Destino 3',103.00,'2026-07-20',3,3,3,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 4','Destino 4',104.00,'2026-07-20',4,4,4,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 5','Destino 5',105.00,'2026-07-20',5,5,5,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 6','Destino 6',106.00,'2026-07-20',6,6,6,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 7','Destino 7',107.00,'2026-07-20',7,7,7,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 8','Destino 8',108.00,'2026-07-20',8,8,8,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 9','Destino 9',109.00,'2026-07-20',9,9,9,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 10','Destino 10',110.00,'2026-07-20',10,10,10,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 11','Destino 11',111.00,'2026-07-20',11,11,11,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 12','Destino 12',112.00,'2026-07-20',12,12,12,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 13','Destino 13',113.00,'2026-07-20',13,13,13,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 14','Destino 14',114.00,'2026-07-20',14,14,14,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 15','Destino 15',115.00,'2026-07-20',15,15,15,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 16','Destino 16',116.00,'2026-07-20',16,16,16,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 17','Destino 17',117.00,'2026-07-20',17,17,17,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 18','Destino 18',118.00,'2026-07-20',18,18,18,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 19','Destino 19',119.00,'2026-07-20',19,19,19,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 20','Destino 20',120.00,'2026-07-20',20,20,20,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 21','Destino 21',121.00,'2026-07-20',21,21,21,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 22','Destino 22',122.00,'2026-07-20',22,22,22,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 23','Destino 23',123.00,'2026-07-20',23,23,23,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 24','Destino 24',124.00,'2026-07-20',24,24,24,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 25','Destino 25',125.00,'2026-07-20',25,25,25,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 26','Destino 26',126.00,'2026-07-20',26,26,26,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 27','Destino 27',127.00,'2026-07-20',27,27,27,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 28','Destino 28',128.00,'2026-07-20',28,28,28,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 29','Destino 29',129.00,'2026-07-20',29,29,29,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 30','Destino 30',130.00,'2026-07-20',30,30,30,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 31','Destino 31',131.00,'2026-07-20',31,31,31,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 32','Destino 32',132.00,'2026-07-20',32,32,32,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 33','Destino 33',133.00,'2026-07-20',33,33,33,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 34','Destino 34',134.00,'2026-07-20',34,34,34,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 35','Destino 35',135.00,'2026-07-20',35,35,35,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 36','Destino 36',136.00,'2026-07-20',36,36,36,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 37','Destino 37',137.00,'2026-07-20',37,37,37,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 38','Destino 38',138.00,'2026-07-20',38,38,38,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 39','Destino 39',139.00,'2026-07-20',39,39,39,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 40','Destino 40',140.00,'2026-07-20',40,40,40,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 41','Destino 41',141.00,'2026-07-20',41,41,41,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 42','Destino 42',142.00,'2026-07-20',42,42,42,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 43','Destino 43',143.00,'2026-07-20',43,43,43,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 44','Destino 44',144.00,'2026-07-20',44,44,44,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 45','Destino 45',145.00,'2026-07-20',45,45,45,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 46','Destino 46',146.00,'2026-07-20',46,46,46,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 47','Destino 47',147.00,'2026-07-20',47,47,47,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 48','Destino 48',148.00,'2026-07-20',48,48,48,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 49','Destino 49',149.00,'2026-07-20',49,49,49,'admin');
+INSERT INTO Rota_Entrega(origem,destino,distancia_km,data_entrega,id_caminhao,id_motorista,id_cliente,usuario_alteracao) VALUES('Origem 50','Destino 50',150.00,'2026-07-20',50,50,50,'admin');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 1',500.00,'Geral',1,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 2',500.00,'Geral',2,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 3',500.00,'Geral',3,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 4',500.00,'Geral',4,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 5',500.00,'Geral',5,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 6',500.00,'Geral',6,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 7',500.00,'Geral',7,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 8',500.00,'Geral',8,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 9',500.00,'Geral',9,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 10',500.00,'Geral',10,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 11',500.00,'Geral',11,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 12',500.00,'Geral',12,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 13',500.00,'Geral',13,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 14',500.00,'Geral',14,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 15',500.00,'Geral',15,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 16',500.00,'Geral',16,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 17',500.00,'Geral',17,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 18',500.00,'Geral',18,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 19',500.00,'Geral',19,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 20',500.00,'Geral',20,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 21',500.00,'Geral',21,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 22',500.00,'Geral',22,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 23',500.00,'Geral',23,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 24',500.00,'Geral',24,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 25',500.00,'Geral',25,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 26',500.00,'Geral',26,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 27',500.00,'Geral',27,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 28',500.00,'Geral',28,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 29',500.00,'Geral',29,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 30',500.00,'Geral',30,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 31',500.00,'Geral',31,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 32',500.00,'Geral',32,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 33',500.00,'Geral',33,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 34',500.00,'Geral',34,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 35',500.00,'Geral',35,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 36',500.00,'Geral',36,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 37',500.00,'Geral',37,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 38',500.00,'Geral',38,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 39',500.00,'Geral',39,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 40',500.00,'Geral',40,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 41',500.00,'Geral',41,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 42',500.00,'Geral',42,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 43',500.00,'Geral',43,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 44',500.00,'Geral',44,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 45',500.00,'Geral',45,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 46',500.00,'Geral',46,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 47',500.00,'Geral',47,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 48',500.00,'Geral',48,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 49',500.00,'Geral',49,'2026-07-20');
+INSERT INTO Carga(descricao,peso,tipo_carga,id_rota,data_cadastro) VALUES('Carga 50',500.00,'Geral',50,'2026-07-20');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',1,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',2,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',3,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',4,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',5,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',6,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',7,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',8,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',9,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',10,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',11,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',12,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',13,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',14,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',15,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',16,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',17,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',18,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',19,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',20,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',21,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',22,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',23,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',24,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',25,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',26,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',27,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',28,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',29,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',30,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',31,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',32,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',33,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',34,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',35,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',36,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',37,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',38,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',39,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',40,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',41,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',42,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',43,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',44,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',45,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',46,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',47,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',48,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',49,'Concluída');
+INSERT INTO Manutencao(data_manutencao,tipo,custo,descricao,id_caminhao,status_servico) VALUES('2026-07-21','Preventiva',250.00,'Rotina',50,'Concluída');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,10100,1,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,10200,2,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,10300,3,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,10400,4,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,10500,5,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,10600,6,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,10700,7,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,10800,8,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,10900,9,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,11000,10,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,11100,11,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,11200,12,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,11300,13,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,11400,14,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,11500,15,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,11600,16,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,11700,17,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,11800,18,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,11900,19,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,12000,20,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,12100,21,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,12200,22,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,12300,23,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,12400,24,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,12500,25,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,12600,26,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,12700,27,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,12800,28,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,12900,29,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,13000,30,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,13100,31,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,13200,32,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,13300,33,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,13400,34,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,13500,35,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,13600,36,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,13700,37,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,13800,38,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,13900,39,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,14000,40,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,14100,41,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,14200,42,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,14300,43,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,14400,44,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,14500,45,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,14600,46,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,14700,47,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,14800,48,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,14900,49,'Abastecimento');
+INSERT INTO Consumo_Combustivel(data_abastecimento,litros,valor,km_atual,id_caminhao,observacao) VALUES('2026-07-22',100.00,650.00,15000,50,'Abastecimento');
