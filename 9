@@ -1,0 +1,739 @@
+CREATE DATABASE SkyLodge;
+USE SkyLodge;
+
+CREATE TABLE Categoria_Quarto(
+id_categoria INT AUTO_INCREMENT PRIMARY KEY,
+nome_categoria VARCHAR(100),
+descricao VARCHAR(150),
+valor_diaria DECIMAL(10,2)
+);
+
+CREATE TABLE Quarto(
+id_quarto INT AUTO_INCREMENT PRIMARY KEY,
+numero INT,
+andar VARCHAR(20),
+status VARCHAR(30),
+id_categoria INT,
+
+FOREIGN KEY(id_categoria)
+REFERENCES Categoria_Quarto(id_categoria)
+);
+
+CREATE TABLE Cliente(
+id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+nome VARCHAR(100),
+cpf VARCHAR(14),
+telefone VARCHAR(20),
+email VARCHAR(100)
+);
+
+CREATE TABLE Reserva(
+id_reserva INT AUTO_INCREMENT PRIMARY KEY,
+data_reserva DATE,
+data_entrada DATE,
+data_saida DATE,
+status VARCHAR(30),
+id_cliente INT,
+id_quarto INT,
+
+FOREIGN KEY(id_cliente)
+REFERENCES Cliente(id_cliente),
+
+FOREIGN KEY(id_quarto)
+REFERENCES Quarto(id_quarto)
+);
+
+CREATE TABLE Consumo(
+id_consumo INT AUTO_INCREMENT PRIMARY KEY,
+descricao VARCHAR(100),
+valor DECIMAL(10,2),
+data_consumo DATE,
+id_reserva INT,
+
+FOREIGN KEY(id_reserva)
+REFERENCES Reserva(id_reserva)
+);
+
+CREATE TABLE Limpeza(
+id_limpeza INT AUTO_INCREMENT PRIMARY KEY,
+data_limpeza DATE,
+funcionario VARCHAR(100),
+observacoes TEXT,
+id_quarto INT,
+
+FOREIGN KEY(id_quarto)
+REFERENCES Quarto(id_quarto)
+);
+
+CREATE TABLE Checkin_Checkout(
+id_check INT AUTO_INCREMENT PRIMARY KEY,
+checkin DATETIME,
+checkout DATETIME,
+status VARCHAR(30),
+id_reserva INT UNIQUE,
+
+FOREIGN KEY(id_reserva)
+REFERENCES Reserva(id_reserva)
+);
+
+ALTER TABLE Categoria_Quarto
+ADD status_ativo BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE Quarto
+ADD data_cadastro DATE;
+
+ALTER TABLE Cliente
+ADD observacoes TEXT;
+
+ALTER TABLE Reserva
+ADD usuario_alteracao VARCHAR(50);
+
+ALTER TABLE Consumo
+ADD forma_pagamento VARCHAR(30);
+
+ALTER TABLE Limpeza
+ADD status_servico VARCHAR(30);
+
+ALTER TABLE Checkin_Checkout
+ADD observacoes TEXT;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarCategoria(
+IN p_nome VARCHAR(100),
+IN p_descricao VARCHAR(150),
+IN p_valor DECIMAL(10,2)
+)
+BEGIN
+
+IF p_valor > 0 THEN
+
+INSERT INTO Categoria_Quarto
+(nome_categoria, descricao, valor_diaria)
+VALUES
+(p_nome, p_descricao, p_valor);
+
+ELSE
+
+SELECT 'Valor da diária inválido.' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarQuarto(
+IN p_numero INT,
+IN p_andar VARCHAR(20),
+IN p_status VARCHAR(30),
+IN p_categoria INT
+)
+BEGIN
+
+DECLARE existe INT;
+
+SELECT COUNT(*) INTO existe
+FROM Categoria_Quarto
+WHERE id_categoria = p_categoria;
+
+IF existe > 0 THEN
+
+INSERT INTO Quarto
+(numero, andar, status, id_categoria)
+VALUES
+(p_numero, p_andar, p_status, p_categoria);
+
+ELSE
+
+SELECT 'Categoria não encontrada.' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarCliente(
+IN p_nome VARCHAR(100),
+IN p_cpf VARCHAR(14),
+IN p_telefone VARCHAR(20),
+IN p_email VARCHAR(100)
+)
+BEGIN
+
+IF EXISTS(
+SELECT *
+FROM Cliente
+WHERE email = p_email)
+
+THEN
+
+SELECT 'Email já cadastrado.' AS Mensagem;
+
+ELSE
+
+INSERT INTO Cliente
+(nome, cpf, telefone, email)
+VALUES
+(p_nome, p_cpf, p_telefone, p_email);
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_CadastrarReserva(
+IN p_data DATE,
+IN p_entrada DATE,
+IN p_saida DATE,
+IN p_status VARCHAR(30),
+IN p_cliente INT,
+IN p_quarto INT
+)
+BEGIN
+
+DECLARE situacao VARCHAR(30);
+
+SELECT status
+INTO situacao
+FROM Quarto
+WHERE id_quarto = p_quarto;
+
+IF situacao = 'Disponivel' THEN
+
+INSERT INTO Reserva
+(data_reserva, data_entrada, data_saida, status, id_cliente, id_quarto)
+
+VALUES
+(p_data, p_entrada, p_saida, p_status, p_cliente, p_quarto);
+
+UPDATE Quarto
+SET status='Reservado'
+WHERE id_quarto=p_quarto;
+
+ELSE
+
+SELECT 'Quarto indisponível.' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_RegistrarConsumo(
+IN p_descricao VARCHAR(100),
+IN p_valor DECIMAL(10,2),
+IN p_data DATE,
+IN p_reserva INT
+)
+BEGIN
+
+IF EXISTS(
+SELECT *
+FROM Reserva
+WHERE id_reserva=p_reserva)
+
+THEN
+
+INSERT INTO Consumo
+(descricao, valor, data_consumo, id_reserva)
+
+VALUES
+(p_descricao, p_valor, p_data, p_reserva);
+
+ELSE
+
+SELECT 'Reserva não encontrada.' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_AgendarLimpeza(
+IN p_data DATE,
+IN p_funcionario VARCHAR(100),
+IN p_obs TEXT,
+IN p_quarto INT
+)
+BEGIN
+
+IF EXISTS(
+SELECT *
+FROM Quarto
+WHERE id_quarto=p_quarto)
+
+THEN
+
+INSERT INTO Limpeza
+(data_limpeza, funcionario, observacoes, id_quarto)
+
+VALUES
+(p_data, p_funcionario, p_obs, p_quarto);
+
+ELSE
+
+SELECT 'Quarto inexistente.' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_Checkin(
+IN p_checkin DATETIME,
+IN p_checkout DATETIME,
+IN p_status VARCHAR(30),
+IN p_reserva INT
+)
+BEGIN
+
+IF EXISTS(
+SELECT *
+FROM Reserva
+WHERE id_reserva=p_reserva)
+
+THEN
+
+INSERT INTO Checkin_Checkout
+(checkin, checkout, status, id_reserva)
+
+VALUES
+(p_checkin, p_checkout, p_status, p_reserva);
+
+UPDATE Reserva
+SET status='Hospedado'
+WHERE id_reserva=p_reserva;
+
+ELSE
+
+SELECT 'Reserva não encontrada.' AS Mensagem;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_reservar_quarto
+AFTER INSERT ON Reserva
+FOR EACH ROW
+BEGIN
+
+UPDATE Quarto
+SET status = 'Reservado'
+WHERE id_quarto = NEW.id_quarto;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_criar_checkin
+AFTER INSERT ON Reserva
+FOR EACH ROW
+BEGIN
+
+INSERT INTO Checkin_Checkout
+(checkin, checkout, status, id_reserva)
+
+VALUES
+(NULL, NULL, 'Pendente', NEW.id_reserva);
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_liberar_quarto
+AFTER UPDATE ON Checkin_Checkout
+FOR EACH ROW
+BEGIN
+
+IF NEW.checkout IS NOT NULL THEN
+
+UPDATE Quarto q
+JOIN Reserva r
+ON q.id_quarto = r.id_quarto
+
+SET q.status = 'Disponível'
+
+WHERE r.id_reserva = NEW.id_reserva;
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 1','Descricao 1',110.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 2','Descricao 2',120.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 3','Descricao 3',130.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 4','Descricao 4',140.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 5','Descricao 5',150.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 6','Descricao 6',160.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 7','Descricao 7',170.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 8','Descricao 8',180.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 9','Descricao 9',190.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 10','Descricao 10',200.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 11','Descricao 11',210.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 12','Descricao 12',220.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 13','Descricao 13',230.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 14','Descricao 14',240.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 15','Descricao 15',250.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 16','Descricao 16',260.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 17','Descricao 17',270.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 18','Descricao 18',280.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 19','Descricao 19',290.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 20','Descricao 20',300.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 21','Descricao 21',310.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 22','Descricao 22',320.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 23','Descricao 23',330.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 24','Descricao 24',340.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 25','Descricao 25',350.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 26','Descricao 26',360.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 27','Descricao 27',370.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 28','Descricao 28',380.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 29','Descricao 29',390.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 30','Descricao 30',400.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 31','Descricao 31',410.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 32','Descricao 32',420.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 33','Descricao 33',430.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 34','Descricao 34',440.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 35','Descricao 35',450.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 36','Descricao 36',460.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 37','Descricao 37',470.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 38','Descricao 38',480.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 39','Descricao 39',490.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 40','Descricao 40',500.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 41','Descricao 41',510.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 42','Descricao 42',520.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 43','Descricao 43',530.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 44','Descricao 44',540.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 45','Descricao 45',550.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 46','Descricao 46',560.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 47','Descricao 47',570.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 48','Descricao 48',580.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 49','Descricao 49',590.00,TRUE);
+INSERT INTO Categoria_Quarto(nome_categoria,descricao,valor_diaria,status_ativo) VALUES('Categoria 50','Descricao 50',600.00,TRUE);
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(101,'Andar 2','Disponivel',1,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(102,'Andar 3','Disponivel',2,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(103,'Andar 4','Disponivel',3,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(104,'Andar 5','Disponivel',4,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(105,'Andar 1','Disponivel',5,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(106,'Andar 2','Disponivel',6,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(107,'Andar 3','Disponivel',7,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(108,'Andar 4','Disponivel',8,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(109,'Andar 5','Disponivel',9,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(110,'Andar 1','Disponivel',10,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(111,'Andar 2','Disponivel',11,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(112,'Andar 3','Disponivel',12,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(113,'Andar 4','Disponivel',13,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(114,'Andar 5','Disponivel',14,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(115,'Andar 1','Disponivel',15,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(116,'Andar 2','Disponivel',16,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(117,'Andar 3','Disponivel',17,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(118,'Andar 4','Disponivel',18,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(119,'Andar 5','Disponivel',19,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(120,'Andar 1','Disponivel',20,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(121,'Andar 2','Disponivel',21,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(122,'Andar 3','Disponivel',22,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(123,'Andar 4','Disponivel',23,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(124,'Andar 5','Disponivel',24,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(125,'Andar 1','Disponivel',25,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(126,'Andar 2','Disponivel',26,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(127,'Andar 3','Disponivel',27,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(128,'Andar 4','Disponivel',28,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(129,'Andar 5','Disponivel',29,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(130,'Andar 1','Disponivel',30,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(131,'Andar 2','Disponivel',31,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(132,'Andar 3','Disponivel',32,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(133,'Andar 4','Disponivel',33,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(134,'Andar 5','Disponivel',34,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(135,'Andar 1','Disponivel',35,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(136,'Andar 2','Disponivel',36,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(137,'Andar 3','Disponivel',37,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(138,'Andar 4','Disponivel',38,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(139,'Andar 5','Disponivel',39,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(140,'Andar 1','Disponivel',40,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(141,'Andar 2','Disponivel',41,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(142,'Andar 3','Disponivel',42,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(143,'Andar 4','Disponivel',43,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(144,'Andar 5','Disponivel',44,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(145,'Andar 1','Disponivel',45,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(146,'Andar 2','Disponivel',46,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(147,'Andar 3','Disponivel',47,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(148,'Andar 4','Disponivel',48,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(149,'Andar 5','Disponivel',49,'2026-01-01');
+INSERT INTO Quarto(numero,andar,status,id_categoria,data_cadastro) VALUES(150,'Andar 1','Disponivel',50,'2026-01-01');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 1','00000000001','31990000001','cliente1@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 2','00000000002','31990000002','cliente2@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 3','00000000003','31990000003','cliente3@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 4','00000000004','31990000004','cliente4@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 5','00000000005','31990000005','cliente5@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 6','00000000006','31990000006','cliente6@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 7','00000000007','31990000007','cliente7@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 8','00000000008','31990000008','cliente8@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 9','00000000009','31990000009','cliente9@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 10','00000000010','31990000010','cliente10@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 11','00000000011','31990000011','cliente11@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 12','00000000012','31990000012','cliente12@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 13','00000000013','31990000013','cliente13@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 14','00000000014','31990000014','cliente14@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 15','00000000015','31990000015','cliente15@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 16','00000000016','31990000016','cliente16@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 17','00000000017','31990000017','cliente17@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 18','00000000018','31990000018','cliente18@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 19','00000000019','31990000019','cliente19@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 20','00000000020','31990000020','cliente20@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 21','00000000021','31990000021','cliente21@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 22','00000000022','31990000022','cliente22@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 23','00000000023','31990000023','cliente23@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 24','00000000024','31990000024','cliente24@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 25','00000000025','31990000025','cliente25@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 26','00000000026','31990000026','cliente26@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 27','00000000027','31990000027','cliente27@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 28','00000000028','31990000028','cliente28@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 29','00000000029','31990000029','cliente29@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 30','00000000030','31990000030','cliente30@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 31','00000000031','31990000031','cliente31@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 32','00000000032','31990000032','cliente32@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 33','00000000033','31990000033','cliente33@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 34','00000000034','31990000034','cliente34@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 35','00000000035','31990000035','cliente35@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 36','00000000036','31990000036','cliente36@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 37','00000000037','31990000037','cliente37@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 38','00000000038','31990000038','cliente38@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 39','00000000039','31990000039','cliente39@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 40','00000000040','31990000040','cliente40@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 41','00000000041','31990000041','cliente41@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 42','00000000042','31990000042','cliente42@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 43','00000000043','31990000043','cliente43@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 44','00000000044','31990000044','cliente44@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 45','00000000045','31990000045','cliente45@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 46','00000000046','31990000046','cliente46@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 47','00000000047','31990000047','cliente47@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 48','00000000048','31990000048','cliente48@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 49','00000000049','31990000049','cliente49@hotel.com','');
+INSERT INTO Cliente(nome,cpf,telefone,email,observacoes) VALUES('Cliente 50','00000000050','31990000050','cliente50@hotel.com','');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',1,1,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',2,2,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',3,3,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',4,4,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',5,5,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',6,6,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',7,7,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',8,8,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',9,9,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',10,10,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',11,11,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',12,12,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',13,13,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',14,14,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',15,15,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',16,16,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',17,17,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',18,18,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',19,19,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',20,20,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',21,21,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',22,22,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',23,23,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',24,24,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',25,25,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',26,26,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',27,27,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',28,28,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',29,29,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',30,30,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',31,31,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',32,32,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',33,33,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',34,34,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',35,35,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',36,36,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',37,37,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',38,38,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',39,39,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',40,40,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',41,41,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',42,42,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',43,43,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',44,44,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',45,45,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',46,46,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',47,47,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',48,48,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',49,49,'admin');
+INSERT INTO Reserva(data_reserva,data_entrada,data_saida,status,id_cliente,id_quarto,usuario_alteracao) VALUES('2026-07-01','2026-07-10','2026-07-12','Reservado',50,50,'admin');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 1',21.00,'2026-07-11',1,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 2',22.00,'2026-07-11',2,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 3',23.00,'2026-07-11',3,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 4',24.00,'2026-07-11',4,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 5',25.00,'2026-07-11',5,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 6',26.00,'2026-07-11',6,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 7',27.00,'2026-07-11',7,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 8',28.00,'2026-07-11',8,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 9',29.00,'2026-07-11',9,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 10',30.00,'2026-07-11',10,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 11',31.00,'2026-07-11',11,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 12',32.00,'2026-07-11',12,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 13',33.00,'2026-07-11',13,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 14',34.00,'2026-07-11',14,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 15',35.00,'2026-07-11',15,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 16',36.00,'2026-07-11',16,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 17',37.00,'2026-07-11',17,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 18',38.00,'2026-07-11',18,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 19',39.00,'2026-07-11',19,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 20',40.00,'2026-07-11',20,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 21',41.00,'2026-07-11',21,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 22',42.00,'2026-07-11',22,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 23',43.00,'2026-07-11',23,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 24',44.00,'2026-07-11',24,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 25',45.00,'2026-07-11',25,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 26',46.00,'2026-07-11',26,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 27',47.00,'2026-07-11',27,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 28',48.00,'2026-07-11',28,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 29',49.00,'2026-07-11',29,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 30',50.00,'2026-07-11',30,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 31',51.00,'2026-07-11',31,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 32',52.00,'2026-07-11',32,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 33',53.00,'2026-07-11',33,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 34',54.00,'2026-07-11',34,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 35',55.00,'2026-07-11',35,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 36',56.00,'2026-07-11',36,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 37',57.00,'2026-07-11',37,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 38',58.00,'2026-07-11',38,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 39',59.00,'2026-07-11',39,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 40',60.00,'2026-07-11',40,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 41',61.00,'2026-07-11',41,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 42',62.00,'2026-07-11',42,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 43',63.00,'2026-07-11',43,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 44',64.00,'2026-07-11',44,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 45',65.00,'2026-07-11',45,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 46',66.00,'2026-07-11',46,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 47',67.00,'2026-07-11',47,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 48',68.00,'2026-07-11',48,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 49',69.00,'2026-07-11',49,'Cartão');
+INSERT INTO Consumo(descricao,valor,data_consumo,id_reserva,forma_pagamento) VALUES('Consumo 50',70.00,'2026-07-11',50,'Cartão');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 1','OK',1,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 2','OK',2,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 3','OK',3,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 4','OK',4,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 5','OK',5,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 6','OK',6,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 7','OK',7,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 8','OK',8,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 9','OK',9,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 10','OK',10,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 11','OK',11,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 12','OK',12,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 13','OK',13,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 14','OK',14,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 15','OK',15,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 16','OK',16,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 17','OK',17,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 18','OK',18,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 19','OK',19,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 20','OK',20,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 21','OK',21,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 22','OK',22,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 23','OK',23,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 24','OK',24,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 25','OK',25,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 26','OK',26,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 27','OK',27,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 28','OK',28,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 29','OK',29,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 30','OK',30,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 31','OK',31,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 32','OK',32,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 33','OK',33,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 34','OK',34,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 35','OK',35,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 36','OK',36,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 37','OK',37,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 38','OK',38,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 39','OK',39,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 40','OK',40,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 41','OK',41,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 42','OK',42,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 43','OK',43,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 44','OK',44,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 45','OK',45,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 46','OK',46,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 47','OK',47,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 48','OK',48,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 49','OK',49,'Concluído');
+INSERT INTO Limpeza(data_limpeza,funcionario,observacoes,id_quarto,status_servico) VALUES('2026-07-09','Funcionario 50','OK',50,'Concluído');
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=1;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=2;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=3;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=4;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=5;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=6;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=7;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=8;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=9;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=10;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=11;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=12;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=13;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=14;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=15;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=16;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=17;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=18;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=19;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=20;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=21;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=22;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=23;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=24;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=25;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=26;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=27;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=28;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=29;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=30;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=31;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=32;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=33;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=34;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=35;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=36;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=37;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=38;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=39;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=40;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=41;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=42;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=43;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=44;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=45;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=46;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=47;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=48;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=49;
+UPDATE Checkin_Checkout SET checkin='2026-07-10 14:00:00', checkout=NULL, status='Hospedado', observacoes='' WHERE id_reserva=50;
