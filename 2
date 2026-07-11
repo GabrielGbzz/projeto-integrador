@@ -1,0 +1,699 @@
+CREATE DATABASE MedPet;
+USE MedPet;
+
+
+CREATE TABLE Cliente (
+    id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100),
+    email VARCHAR(100),
+    endereco VARCHAR(150)
+);
+
+
+CREATE TABLE Animal (
+    id_animal INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100),
+    especie VARCHAR(50),
+    raca VARCHAR(50),
+    sexo CHAR(1),
+    data_nascimento DATE,
+    peso DECIMAL(5,2),
+    id_cliente INT,
+    FOREIGN KEY (id_cliente)
+	REFERENCES Cliente(id_cliente)
+);
+
+
+CREATE TABLE Consulta (
+    id_consulta INT AUTO_INCREMENT PRIMARY KEY,
+    data_consulta DATE,
+    hora TIME,
+    diagnostico VARCHAR(255),
+    observacoes TEXT,
+    id_animal INT,
+    FOREIGN KEY (id_animal)
+	REFERENCES Animal(id_animal)
+);
+
+
+CREATE TABLE Internamento (
+    id_internamento INT AUTO_INCREMENT PRIMARY KEY,
+    data_entrada DATE,
+    data_saida DATE,
+    motivo VARCHAR(150),
+    quarto VARCHAR(20),
+    status VARCHAR(30),
+    id_animal INT,
+    FOREIGN KEY (id_animal)
+	REFERENCES Animal(id_animal)
+);
+
+
+CREATE TABLE Historico_Medico (
+    id_historico INT AUTO_INCREMENT PRIMARY KEY,
+    tipo_registro VARCHAR(50),
+    descricao TEXT,
+    data_registro DATE,
+    id_animal INT,
+    FOREIGN KEY (id_animal)
+	REFERENCES Animal(id_animal)
+);
+
+
+CREATE TABLE Fatura (
+    id_fatura INT AUTO_INCREMENT PRIMARY KEY,
+    data_emissao DATE,
+    valor_total DECIMAL(10,2),
+    forma_pagamento VARCHAR(50),
+    status VARCHAR(30),
+    id_dono INT,
+    FOREIGN KEY (id_dono)
+    REFERENCES Cliente(id_cliente)
+);
+
+
+CREATE TABLE Item_Fatura (
+    id_item INT AUTO_INCREMENT PRIMARY KEY,
+    descricao_servico VARCHAR(100),
+    valor DECIMAL(10,2),
+    quantidade INT,
+    id_fatura INT,
+    FOREIGN KEY (id_fatura)
+	REFERENCES Fatura(id_fatura)
+);
+
+ALTER TABLE Cliente
+ADD status_ativo BOOLEAN;
+
+ALTER TABLE Animal
+ADD status_ativo BOOLEAN;
+
+ALTER TABLE Consulta
+ADD data_criacao DATETIME;
+
+ALTER TABLE Internamento
+ADD observacoes_internas VARCHAR(255);
+
+ALTER TABLE Historico_Medico
+ADD usuario_alteracao VARCHAR(50);
+
+ALTER TABLE Fatura
+ADD data_criacao DATETIME;
+
+ALTER TABLE Item_Fatura
+ADD observacoes VARCHAR(150);
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirCliente(
+IN p_nome VARCHAR(100),
+IN p_email VARCHAR(100),
+IN p_endereco VARCHAR(150)
+)
+BEGIN
+
+IF EXISTS (SELECT * FROM Cliente WHERE email=p_email) THEN
+SELECT 'Cliente já existe.' AS Mensagem;
+ELSE
+INSERT INTO Cliente(nome,email,endereco)
+VALUES(p_nome,p_email,p_endereco);
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InserirAnimal(
+IN p_nome VARCHAR(100),
+IN p_especie VARCHAR(50),
+IN p_raca VARCHAR(50),
+IN p_cliente INT
+)
+BEGIN
+
+IF EXISTS (SELECT * FROM Cliente WHERE id_cliente=p_cliente) THEN
+
+INSERT INTO Animal(nome,especie,raca,id_cliente)
+VALUES(p_nome,p_especie,p_raca,p_cliente);
+
+ELSE
+
+SELECT 'Cliente não encontrado.' AS Mensagem;
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE MarcarConsulta(
+IN p_data DATE,
+IN p_hora TIME,
+IN p_diag VARCHAR(255),
+IN p_animal INT
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Animal WHERE id_animal=p_animal) THEN
+
+INSERT INTO Consulta(data_consulta,hora,diagnostico,id_animal)
+VALUES(p_data,p_hora,p_diag,p_animal);
+
+ELSE
+
+SELECT 'Animal inexistente.' AS Mensagem;
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE InternarAnimal(
+IN p_data DATE,
+IN p_motivo VARCHAR(150),
+IN p_quarto VARCHAR(20),
+IN p_animal INT
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Animal WHERE id_animal=p_animal) THEN
+
+INSERT INTO Internamento
+(data_entrada,motivo,quarto,status,id_animal)
+VALUES(p_data,p_motivo,p_quarto,'Internado',p_animal);
+
+ELSE
+
+SELECT 'Animal não existe.' AS Mensagem;
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE AdicionarHistorico(
+IN p_tipo VARCHAR(50),
+IN p_desc TEXT,
+IN p_data DATE,
+IN p_animal INT
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Animal WHERE id_animal=p_animal) THEN
+
+INSERT INTO Historico_Medico
+(tipo_registro,descricao,data_registro,id_animal)
+VALUES(p_tipo,p_desc,p_data,p_animal);
+
+ELSE
+
+SELECT 'Animal não encontrado.' AS Mensagem;
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE CriarFatura(
+IN p_data DATE,
+IN p_valor DECIMAL(10,2),
+IN p_pagamento VARCHAR(50),
+IN p_cliente INT
+)
+BEGIN
+
+IF EXISTS(SELECT * FROM Cliente WHERE id_cliente=p_cliente) THEN
+
+INSERT INTO Fatura
+(data_emissao,valor_total,forma_pagamento,status,id_dono)
+VALUES(p_data,p_valor,p_pagamento,'Pendente',p_cliente);
+
+ELSE
+
+SELECT 'Cliente inexistente.' AS Mensagem;
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE AdicionarItemFatura(
+IN p_desc VARCHAR(100),
+IN p_valor DECIMAL(10,2),
+IN p_qtd INT,
+IN p_fatura INT
+)
+BEGIN
+
+DECLARE total DECIMAL(10,2);
+
+IF EXISTS(SELECT * FROM Fatura WHERE id_fatura=p_fatura) THEN
+
+SET total = p_valor * p_qtd;
+
+INSERT INTO Item_Fatura
+(descricao_servico,valor,quantidade,id_fatura)
+VALUES(p_desc,total,p_qtd,p_fatura);
+
+ELSE
+
+SELECT 'Fatura não encontrada.' AS Mensagem;
+
+END IF;
+
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_historico_consulta
+AFTER INSERT ON Consulta
+FOR EACH ROW
+BEGIN
+
+INSERT INTO Historico_Medico
+(tipo_registro, descricao, data_registro, id_animal)
+
+VALUES
+('Consulta',
+NEW.diagnostico,
+NEW.data_consulta,
+NEW.id_animal);
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_status_fatura
+AFTER INSERT ON Item_Fatura
+FOR EACH ROW
+BEGIN
+
+UPDATE Fatura
+SET status = 'Pendente'
+WHERE id_fatura = NEW.id_fatura;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_verificar_datas
+BEFORE INSERT ON Internamento
+FOR EACH ROW
+BEGIN
+
+IF NEW.data_saida IS NOT NULL
+AND NEW.data_saida < NEW.data_entrada THEN
+
+SIGNAL SQLSTATE '45000'
+SET MESSAGE_TEXT = 'A data de saída não pode ser anterior à data de entrada.';
+
+END IF;
+
+END $$
+
+DELIMITER ;
+
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 1','cliente1@email.com','Rua 1');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 2','cliente2@email.com','Rua 2');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 3','cliente3@email.com','Rua 3');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 4','cliente4@email.com','Rua 4');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 5','cliente5@email.com','Rua 5');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 6','cliente6@email.com','Rua 6');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 7','cliente7@email.com','Rua 7');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 8','cliente8@email.com','Rua 8');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 9','cliente9@email.com','Rua 9');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 10','cliente10@email.com','Rua 10');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 11','cliente11@email.com','Rua 11');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 12','cliente12@email.com','Rua 12');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 13','cliente13@email.com','Rua 13');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 14','cliente14@email.com','Rua 14');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 15','cliente15@email.com','Rua 15');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 16','cliente16@email.com','Rua 16');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 17','cliente17@email.com','Rua 17');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 18','cliente18@email.com','Rua 18');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 19','cliente19@email.com','Rua 19');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 20','cliente20@email.com','Rua 20');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 21','cliente21@email.com','Rua 21');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 22','cliente22@email.com','Rua 22');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 23','cliente23@email.com','Rua 23');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 24','cliente24@email.com','Rua 24');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 25','cliente25@email.com','Rua 25');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 26','cliente26@email.com','Rua 26');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 27','cliente27@email.com','Rua 27');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 28','cliente28@email.com','Rua 28');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 29','cliente29@email.com','Rua 29');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 30','cliente30@email.com','Rua 30');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 31','cliente31@email.com','Rua 31');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 32','cliente32@email.com','Rua 32');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 33','cliente33@email.com','Rua 33');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 34','cliente34@email.com','Rua 34');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 35','cliente35@email.com','Rua 35');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 36','cliente36@email.com','Rua 36');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 37','cliente37@email.com','Rua 37');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 38','cliente38@email.com','Rua 38');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 39','cliente39@email.com','Rua 39');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 40','cliente40@email.com','Rua 40');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 41','cliente41@email.com','Rua 41');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 42','cliente42@email.com','Rua 42');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 43','cliente43@email.com','Rua 43');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 44','cliente44@email.com','Rua 44');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 45','cliente45@email.com','Rua 45');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 46','cliente46@email.com','Rua 46');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 47','cliente47@email.com','Rua 47');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 48','cliente48@email.com','Rua 48');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 49','cliente49@email.com','Rua 49');
+INSERT INTO Cliente (nome,email,endereco) VALUES ('Cliente 50','cliente50@email.com','Rua 50');
+
+-- Animal
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 1','Cachorro','SRD','M','2020-01-01',6.00,1);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 2','Cachorro','SRD','M','2020-01-02',7.00,2);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 3','Cachorro','SRD','M','2020-01-03',8.00,3);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 4','Cachorro','SRD','M','2020-01-04',9.00,4);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 5','Cachorro','SRD','M','2020-01-05',10.00,5);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 6','Cachorro','SRD','M','2020-01-06',11.00,6);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 7','Cachorro','SRD','M','2020-01-07',12.00,7);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 8','Cachorro','SRD','M','2020-01-08',13.00,8);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 9','Cachorro','SRD','M','2020-01-09',14.00,9);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 10','Cachorro','SRD','M','2020-01-10',15.00,10);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 11','Cachorro','SRD','M','2020-01-11',16.00,11);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 12','Cachorro','SRD','M','2020-01-12',17.00,12);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 13','Cachorro','SRD','M','2020-01-13',18.00,13);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 14','Cachorro','SRD','M','2020-01-14',19.00,14);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 15','Cachorro','SRD','M','2020-01-15',20.00,15);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 16','Cachorro','SRD','M','2020-01-16',21.00,16);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 17','Cachorro','SRD','M','2020-01-17',22.00,17);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 18','Cachorro','SRD','M','2020-01-18',23.00,18);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 19','Cachorro','SRD','M','2020-01-19',24.00,19);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 20','Cachorro','SRD','M','2020-01-20',5.00,20);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 21','Cachorro','SRD','M','2020-01-21',6.00,21);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 22','Cachorro','SRD','M','2020-01-22',7.00,22);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 23','Cachorro','SRD','M','2020-01-23',8.00,23);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 24','Cachorro','SRD','M','2020-01-24',9.00,24);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 25','Cachorro','SRD','M','2020-01-25',10.00,25);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 26','Cachorro','SRD','M','2020-01-26',11.00,26);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 27','Cachorro','SRD','M','2020-01-27',12.00,27);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 28','Cachorro','SRD','M','2020-01-28',13.00,28);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 29','Cachorro','SRD','M','2020-01-01',14.00,29);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 30','Cachorro','SRD','M','2020-01-02',15.00,30);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 31','Cachorro','SRD','M','2020-01-03',16.00,31);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 32','Cachorro','SRD','M','2020-01-04',17.00,32);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 33','Cachorro','SRD','M','2020-01-05',18.00,33);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 34','Cachorro','SRD','M','2020-01-06',19.00,34);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 35','Cachorro','SRD','M','2020-01-07',20.00,35);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 36','Cachorro','SRD','M','2020-01-08',21.00,36);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 37','Cachorro','SRD','M','2020-01-09',22.00,37);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 38','Cachorro','SRD','M','2020-01-10',23.00,38);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 39','Cachorro','SRD','M','2020-01-11',24.00,39);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 40','Cachorro','SRD','M','2020-01-12',5.00,40);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 41','Cachorro','SRD','M','2020-01-13',6.00,41);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 42','Cachorro','SRD','M','2020-01-14',7.00,42);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 43','Cachorro','SRD','M','2020-01-15',8.00,43);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 44','Cachorro','SRD','M','2020-01-16',9.00,44);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 45','Cachorro','SRD','M','2020-01-17',10.00,45);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 46','Cachorro','SRD','M','2020-01-18',11.00,46);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 47','Cachorro','SRD','M','2020-01-19',12.00,47);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 48','Cachorro','SRD','M','2020-01-20',13.00,48);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 49','Cachorro','SRD','M','2020-01-21',14.00,49);
+INSERT INTO Animal (nome,especie,raca,sexo,data_nascimento,peso,id_cliente) VALUES ('Animal 50','Cachorro','SRD','M','2020-01-22',15.00,50);
+
+-- Consulta
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-01','08:00:00','Diagnóstico 1','Obs 1',1);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-02','08:00:00','Diagnóstico 2','Obs 2',2);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-03','08:00:00','Diagnóstico 3','Obs 3',3);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-04','08:00:00','Diagnóstico 4','Obs 4',4);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-05','08:00:00','Diagnóstico 5','Obs 5',5);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-06','08:00:00','Diagnóstico 6','Obs 6',6);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-07','08:00:00','Diagnóstico 7','Obs 7',7);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-08','08:00:00','Diagnóstico 8','Obs 8',8);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-09','08:00:00','Diagnóstico 9','Obs 9',9);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-10','08:00:00','Diagnóstico 10','Obs 10',10);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-11','08:00:00','Diagnóstico 11','Obs 11',11);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-12','08:00:00','Diagnóstico 12','Obs 12',12);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-13','08:00:00','Diagnóstico 13','Obs 13',13);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-14','08:00:00','Diagnóstico 14','Obs 14',14);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-15','08:00:00','Diagnóstico 15','Obs 15',15);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-16','08:00:00','Diagnóstico 16','Obs 16',16);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-17','08:00:00','Diagnóstico 17','Obs 17',17);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-18','08:00:00','Diagnóstico 18','Obs 18',18);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-19','08:00:00','Diagnóstico 19','Obs 19',19);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-20','08:00:00','Diagnóstico 20','Obs 20',20);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-21','08:00:00','Diagnóstico 21','Obs 21',21);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-22','08:00:00','Diagnóstico 22','Obs 22',22);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-23','08:00:00','Diagnóstico 23','Obs 23',23);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-24','08:00:00','Diagnóstico 24','Obs 24',24);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-25','08:00:00','Diagnóstico 25','Obs 25',25);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-26','08:00:00','Diagnóstico 26','Obs 26',26);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-27','08:00:00','Diagnóstico 27','Obs 27',27);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-28','08:00:00','Diagnóstico 28','Obs 28',28);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-01','08:00:00','Diagnóstico 29','Obs 29',29);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-02','08:00:00','Diagnóstico 30','Obs 30',30);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-03','08:00:00','Diagnóstico 31','Obs 31',31);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-04','08:00:00','Diagnóstico 32','Obs 32',32);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-05','08:00:00','Diagnóstico 33','Obs 33',33);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-06','08:00:00','Diagnóstico 34','Obs 34',34);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-07','08:00:00','Diagnóstico 35','Obs 35',35);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-08','08:00:00','Diagnóstico 36','Obs 36',36);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-09','08:00:00','Diagnóstico 37','Obs 37',37);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-10','08:00:00','Diagnóstico 38','Obs 38',38);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-11','08:00:00','Diagnóstico 39','Obs 39',39);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-12','08:00:00','Diagnóstico 40','Obs 40',40);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-13','08:00:00','Diagnóstico 41','Obs 41',41);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-14','08:00:00','Diagnóstico 42','Obs 42',42);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-15','08:00:00','Diagnóstico 43','Obs 43',43);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-16','08:00:00','Diagnóstico 44','Obs 44',44);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-17','08:00:00','Diagnóstico 45','Obs 45',45);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-18','08:00:00','Diagnóstico 46','Obs 46',46);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-19','08:00:00','Diagnóstico 47','Obs 47',47);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-20','08:00:00','Diagnóstico 48','Obs 48',48);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-21','08:00:00','Diagnóstico 49','Obs 49',49);
+INSERT INTO Consulta (data_consulta,hora,diagnostico,observacoes,id_animal) VALUES ('2026-01-22','08:00:00','Diagnóstico 50','Obs 50',50);
+
+-- Internamento
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-01',NULL,'Motivo 1','Q2','Internado',1);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-02',NULL,'Motivo 2','Q3','Internado',2);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-03',NULL,'Motivo 3','Q4','Internado',3);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-04',NULL,'Motivo 4','Q5','Internado',4);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-05',NULL,'Motivo 5','Q6','Internado',5);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-06',NULL,'Motivo 6','Q7','Internado',6);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-07',NULL,'Motivo 7','Q8','Internado',7);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-08',NULL,'Motivo 8','Q9','Internado',8);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-09',NULL,'Motivo 9','Q10','Internado',9);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-10',NULL,'Motivo 10','Q1','Internado',10);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-11',NULL,'Motivo 11','Q2','Internado',11);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-12',NULL,'Motivo 12','Q3','Internado',12);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-13',NULL,'Motivo 13','Q4','Internado',13);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-14',NULL,'Motivo 14','Q5','Internado',14);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-15',NULL,'Motivo 15','Q6','Internado',15);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-16',NULL,'Motivo 16','Q7','Internado',16);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-17',NULL,'Motivo 17','Q8','Internado',17);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-18',NULL,'Motivo 18','Q9','Internado',18);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-19',NULL,'Motivo 19','Q10','Internado',19);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-20',NULL,'Motivo 20','Q1','Internado',20);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-21',NULL,'Motivo 21','Q2','Internado',21);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-22',NULL,'Motivo 22','Q3','Internado',22);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-23',NULL,'Motivo 23','Q4','Internado',23);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-24',NULL,'Motivo 24','Q5','Internado',24);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-25',NULL,'Motivo 25','Q6','Internado',25);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-26',NULL,'Motivo 26','Q7','Internado',26);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-27',NULL,'Motivo 27','Q8','Internado',27);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-28',NULL,'Motivo 28','Q9','Internado',28);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-01',NULL,'Motivo 29','Q10','Internado',29);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-02',NULL,'Motivo 30','Q1','Internado',30);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-03',NULL,'Motivo 31','Q2','Internado',31);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-04',NULL,'Motivo 32','Q3','Internado',32);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-05',NULL,'Motivo 33','Q4','Internado',33);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-06',NULL,'Motivo 34','Q5','Internado',34);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-07',NULL,'Motivo 35','Q6','Internado',35);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-08',NULL,'Motivo 36','Q7','Internado',36);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-09',NULL,'Motivo 37','Q8','Internado',37);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-10',NULL,'Motivo 38','Q9','Internado',38);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-11',NULL,'Motivo 39','Q10','Internado',39);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-12',NULL,'Motivo 40','Q1','Internado',40);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-13',NULL,'Motivo 41','Q2','Internado',41);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-14',NULL,'Motivo 42','Q3','Internado',42);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-15',NULL,'Motivo 43','Q4','Internado',43);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-16',NULL,'Motivo 44','Q5','Internado',44);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-17',NULL,'Motivo 45','Q6','Internado',45);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-18',NULL,'Motivo 46','Q7','Internado',46);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-19',NULL,'Motivo 47','Q8','Internado',47);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-20',NULL,'Motivo 48','Q9','Internado',48);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-21',NULL,'Motivo 49','Q10','Internado',49);
+INSERT INTO Internamento (data_entrada,data_saida,motivo,quarto,status,id_animal) VALUES ('2026-02-22',NULL,'Motivo 50','Q1','Internado',50);
+
+-- Historico_Medico
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 1','2026-03-01',1);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 2','2026-03-02',2);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 3','2026-03-03',3);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 4','2026-03-04',4);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 5','2026-03-05',5);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 6','2026-03-06',6);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 7','2026-03-07',7);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 8','2026-03-08',8);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 9','2026-03-09',9);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 10','2026-03-10',10);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 11','2026-03-11',11);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 12','2026-03-12',12);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 13','2026-03-13',13);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 14','2026-03-14',14);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 15','2026-03-15',15);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 16','2026-03-16',16);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 17','2026-03-17',17);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 18','2026-03-18',18);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 19','2026-03-19',19);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 20','2026-03-20',20);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 21','2026-03-21',21);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 22','2026-03-22',22);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 23','2026-03-23',23);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 24','2026-03-24',24);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 25','2026-03-25',25);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 26','2026-03-26',26);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 27','2026-03-27',27);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 28','2026-03-28',28);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 29','2026-03-01',29);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 30','2026-03-02',30);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 31','2026-03-03',31);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 32','2026-03-04',32);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 33','2026-03-05',33);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 34','2026-03-06',34);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 35','2026-03-07',35);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 36','2026-03-08',36);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 37','2026-03-09',37);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 38','2026-03-10',38);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 39','2026-03-11',39);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 40','2026-03-12',40);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 41','2026-03-13',41);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 42','2026-03-14',42);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 43','2026-03-15',43);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 44','2026-03-16',44);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 45','2026-03-17',45);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 46','2026-03-18',46);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 47','2026-03-19',47);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 48','2026-03-20',48);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 49','2026-03-21',49);
+INSERT INTO Historico_Medico (tipo_registro,descricao,data_registro,id_animal) VALUES ('Consulta','Histórico 50','2026-03-22',50);
+
+-- Fatura
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-01',101.00,'Cartão','Pendente',1);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-02',102.00,'Cartão','Pendente',2);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-03',103.00,'Cartão','Pendente',3);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-04',104.00,'Cartão','Pendente',4);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-05',105.00,'Cartão','Pendente',5);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-06',106.00,'Cartão','Pendente',6);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-07',107.00,'Cartão','Pendente',7);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-08',108.00,'Cartão','Pendente',8);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-09',109.00,'Cartão','Pendente',9);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-10',110.00,'Cartão','Pendente',10);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-11',111.00,'Cartão','Pendente',11);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-12',112.00,'Cartão','Pendente',12);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-13',113.00,'Cartão','Pendente',13);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-14',114.00,'Cartão','Pendente',14);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-15',115.00,'Cartão','Pendente',15);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-16',116.00,'Cartão','Pendente',16);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-17',117.00,'Cartão','Pendente',17);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-18',118.00,'Cartão','Pendente',18);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-19',119.00,'Cartão','Pendente',19);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-20',120.00,'Cartão','Pendente',20);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-21',121.00,'Cartão','Pendente',21);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-22',122.00,'Cartão','Pendente',22);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-23',123.00,'Cartão','Pendente',23);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-24',124.00,'Cartão','Pendente',24);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-25',125.00,'Cartão','Pendente',25);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-26',126.00,'Cartão','Pendente',26);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-27',127.00,'Cartão','Pendente',27);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-28',128.00,'Cartão','Pendente',28);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-01',129.00,'Cartão','Pendente',29);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-02',130.00,'Cartão','Pendente',30);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-03',131.00,'Cartão','Pendente',31);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-04',132.00,'Cartão','Pendente',32);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-05',133.00,'Cartão','Pendente',33);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-06',134.00,'Cartão','Pendente',34);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-07',135.00,'Cartão','Pendente',35);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-08',136.00,'Cartão','Pendente',36);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-09',137.00,'Cartão','Pendente',37);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-10',138.00,'Cartão','Pendente',38);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-11',139.00,'Cartão','Pendente',39);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-12',140.00,'Cartão','Pendente',40);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-13',141.00,'Cartão','Pendente',41);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-14',142.00,'Cartão','Pendente',42);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-15',143.00,'Cartão','Pendente',43);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-16',144.00,'Cartão','Pendente',44);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-17',145.00,'Cartão','Pendente',45);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-18',146.00,'Cartão','Pendente',46);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-19',147.00,'Cartão','Pendente',47);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-20',148.00,'Cartão','Pendente',48);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-21',149.00,'Cartão','Pendente',49);
+INSERT INTO Fatura (data_emissao,valor_total,forma_pagamento,status,id_dono) VALUES ('2026-04-22',150.00,'Cartão','Pendente',50);
+
+-- Item_Fatura
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 1',51.00,1,1);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 2',52.00,1,2);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 3',53.00,1,3);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 4',54.00,1,4);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 5',55.00,1,5);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 6',56.00,1,6);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 7',57.00,1,7);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 8',58.00,1,8);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 9',59.00,1,9);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 10',60.00,1,10);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 11',61.00,1,11);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 12',62.00,1,12);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 13',63.00,1,13);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 14',64.00,1,14);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 15',65.00,1,15);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 16',66.00,1,16);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 17',67.00,1,17);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 18',68.00,1,18);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 19',69.00,1,19);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 20',70.00,1,20);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 21',71.00,1,21);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 22',72.00,1,22);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 23',73.00,1,23);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 24',74.00,1,24);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 25',75.00,1,25);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 26',76.00,1,26);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 27',77.00,1,27);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 28',78.00,1,28);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 29',79.00,1,29);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 30',80.00,1,30);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 31',81.00,1,31);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 32',82.00,1,32);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 33',83.00,1,33);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 34',84.00,1,34);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 35',85.00,1,35);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 36',86.00,1,36);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 37',87.00,1,37);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 38',88.00,1,38);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 39',89.00,1,39);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 40',90.00,1,40);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 41',91.00,1,41);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 42',92.00,1,42);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 43',93.00,1,43);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 44',94.00,1,44);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 45',95.00,1,45);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 46',96.00,1,46);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 47',97.00,1,47);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 48',98.00,1,48);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 49',99.00,1,49);
+INSERT INTO Item_Fatura (descricao_servico,valor,quantidade,id_fatura) VALUES ('Serviço 50',100.00,1,50);
